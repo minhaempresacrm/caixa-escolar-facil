@@ -6,10 +6,27 @@
  */
 
 import { gerarHashPin, limparTexto } from './security.js';
+import { obterSlugEscolaUrl } from './rpmaster_bridge.js';
 
-const CHAVE_DADOS = 'cef_dados_escola_v1';
-const CHAVE_SESSAO_LEMBRAR = 'cef_sessao_lembrar_v1';
+const CHAVE_DADOS_BASE = 'cef_dados_escola_v1';
+const CHAVE_SESSAO_LEMBRAR_BASE = 'cef_sessao_lembrar_v1';
 const CHAVE_PREF_LETRA = 'cef_letra_extra_grande_v1';
+
+let _sincronizadorNuvem = null;
+
+export function registrarSincronizadorNuvem(fn) {
+  _sincronizadorNuvem = typeof fn === 'function' ? fn : null;
+}
+
+function chaveDadosEscopada() {
+  const slug = obterSlugEscolaUrl();
+  return slug ? `${CHAVE_DADOS_BASE}__${slug}` : CHAVE_DADOS_BASE;
+}
+
+function chaveSessaoEscopada() {
+  const slug = obterSlugEscolaUrl();
+  return slug ? `${CHAVE_SESSAO_LEMBRAR_BASE}__${slug}` : CHAVE_SESSAO_LEMBRAR_BASE;
+}
 
 const VERBAS_PADRAO = [
   { id: 'verba-pdde', nome: 'PDDE Básico', icone: 'escola', arquivada: false },
@@ -99,7 +116,7 @@ function criarExemplosIniciais() {
  */
 export async function carregarEstadoEscola() {
   try {
-    const salvo = localStorage.getItem(CHAVE_DADOS);
+    const salvo = typeof localStorage !== 'undefined' ? localStorage.getItem(chaveDadosEscopada()) : null;
     if (salvo) {
       const dados = JSON.parse(salvo);
       if (dados && Array.isArray(dados.verbas) && Array.isArray(dados.lancamentos)) {
@@ -131,9 +148,12 @@ export async function carregarEstadoEscola() {
   return estadoInicial;
 }
 
-export function salvarEstadoEscola(estado) {
+export function salvarEstadoEscola(estado, { ignorarNuvem = false } = {}) {
   if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(CHAVE_DADOS, JSON.stringify(estado));
+    localStorage.setItem(chaveDadosEscopada(), JSON.stringify(estado));
+  }
+  if (!ignorarNuvem && _sincronizadorNuvem) {
+    _sincronizadorNuvem(estado);
   }
 }
 
@@ -416,14 +436,15 @@ export async function atualizarConfiguracoesEscola(estado, { nomeEscola, novoPin
 }
 
 export function obterSessaoLembrada() {
-  return localStorage.getItem(CHAVE_SESSAO_LEMBRAR) === 'sim';
+  return typeof localStorage !== 'undefined' && localStorage.getItem(chaveSessaoEscopada()) === 'sim';
 }
 
 export function definirSessaoLembrada(lembrar) {
+  if (typeof localStorage === 'undefined') return;
   if (lembrar) {
-    localStorage.setItem(CHAVE_SESSAO_LEMBRAR, 'sim');
+    localStorage.setItem(chaveSessaoEscopada(), 'sim');
   } else {
-    localStorage.removeItem(CHAVE_SESSAO_LEMBRAR);
+    localStorage.removeItem(chaveSessaoEscopada());
   }
 }
 

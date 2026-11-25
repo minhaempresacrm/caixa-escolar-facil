@@ -1,9 +1,10 @@
 /**
  * Service Worker leve para funcionar como Aplicativo (PWA) no celular
- * e abrir mesmo quando a internet da escola estiver fraca ou fora do ar.
+ * - v5: inclui rpmaster_bridge.js, ignora chamadas de API Supabase (sempre rede)
+ *   e usa network-first para HTML/JS para entregar atualizações imediatamente.
  */
 
-const CACHE_NOME = 'caixa-escolar-facil-v4';
+const CACHE_NOME = 'caixa-escolar-facil-v5';
 const ARQUIVOS_BASE = [
   './',
   './index.html',
@@ -17,6 +18,7 @@ const ARQUIVOS_BASE = [
   './js/storage.js',
   './js/attachments.js',
   './js/cloud.js',
+  './js/rpmaster_bridge.js',
 ];
 
 self.addEventListener('install', (event) => {
@@ -41,13 +43,18 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  const url = event.request.url || '';
+  if (url.includes('supabase.co')) return;
 
   event.respondWith(
-    caches.match(event.request).then((respostaCache) => {
-      return (
-        respostaCache ||
-        fetch(event.request).catch(() => caches.match('./index.html'))
-      );
-    })
+    fetch(event.request)
+      .then((resposta) => {
+        if (resposta && resposta.ok && resposta.type === 'basic') {
+          const clone = resposta.clone();
+          caches.open(CACHE_NOME).then((cache) => cache.put(event.request, clone)).catch(() => {});
+        }
+        return resposta;
+      })
+      .catch(() => caches.match(event.request).then((c) => c || caches.match('./index.html')))
   );
 });

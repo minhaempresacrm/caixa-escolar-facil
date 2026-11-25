@@ -60,11 +60,16 @@ export async function exportarBackupCompleto(estadoDados) {
     anexos = [];
   }
 
+  const dadosExport = structuredClone(estadoDados);
+  if (dadosExport && dadosExport.escola && typeof dadosExport.escola.pinHash !== 'string') {
+    dadosExport.escola.pinHash = 'cloud-bcrypt-managed';
+  }
+
   const pacote = {
     sistema: 'CaixaEscolarFacil',
     versao: VERSAO_BACKUP,
     geradoEm: new Date().toISOString(),
-    dados: estadoDados,
+    dados: dadosExport,
     anexos,
   };
 

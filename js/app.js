@@ -19,6 +19,7 @@ import { gerarHashPin, controleTentativas } from './security.js';
 import {
   carregarEstadoEscola,
   salvarEstadoEscola,
+  registrarSincronizadorNuvem,
   adicionarNovaVerba,
   editarVerba,
   removerOuArquivarVerba,
@@ -47,6 +48,30 @@ import {
 } from './cloud.js';
 import { criarIcone, resolverChaveIcone } from './icons.js';
 import { renderizarGraficoPizza, renderizarGraficoBarrasVerbas } from './charts.js';
+import {
+  obterSlugEscolaUrl,
+  modoNuvemAtivo,
+  consumirImpersonacaoUrl,
+  obterInfoPublicaEscola,
+  entrarComPinNuvem,
+  buscarEstadoNuvem,
+  salvarEstadoNuvem,
+  sairSessaoNuvem,
+  obterTokenNuvemAtivo,
+  estaEmImpersonacao,
+  obterEscolaPublicaAtual,
+  aplicarIdentidadeVisualEscola,
+  moduloCefAtivo,
+} from './rpmaster_bridge.js';
+
+// Frame-busting anti-clickjacking (compatível com CSP script-src 'self')
+if (window.top !== window.self) {
+  try {
+    window.top.location = window.self.location.href;
+  } catch {
+    document.documentElement.style.display = 'none';
+  }
+}
 
 const ATALHOS_GASTO = [
   'Papelaria / Expediente',
@@ -276,10 +301,162 @@ function limparErroPin() {
 
 function atualizarDicaPinAcesso() {
   const blocoDica = el.textoDicaPin.parentElement;
+  if (modoNuvemAtivo()) {
+    const pub = obterEscolaPublicaAtual();
+    blocoDica.hidden = !(pub && pub.mostrar_dica_pin_padrao === true);
+    return;
+  }
   blocoDica.hidden = !estadoUI.dados.escola.usandoPinPadrao;
 }
 
+function exibirBloqueioTelaAcesso(mensagem) {
+  const box = document.getElementById('aviso-bloqueio-escola');
+  const teclado = document.getElementById('teclado-pin-wrap');
+  const bolinhas = document.querySelector('.pin-bolinhas');
+  const instrucao = document.getElementById('instrucao-pin');
+  const lembrar = document.querySelector('.opcao-lembrar');
+  const dica = el.textoDicaPin ? el.textoDicaPin.parentElement : null;
+  if (box) {
+    box.textContent = mensagem;
+    box.hidden = false;
+  }
+  if (teclado) teclado.hidden = true;
+  if (bolinhas) bolinhas.hidden = true;
+  if (instrucao) instrucao.hidden = true;
+  if (lembrar) lembrar.hidden = true;
+  if (dica) dica.hidden = true;
+}
+
+function normalizarEstadoNuvem(estadoRemoto, escolaInfo) {
+  const base = estadoRemoto && typeof estadoRemoto === 'object' ? estadoRemoto : {};
+  const nome = (escolaInfo && escolaInfo.nome_escola) || (base.escola && base.escola.nome) || 'Escola';
+  return {
+    escola: {
+      nome,
+      pinHash: 'cloud-bcrypt-managed',
+      usandoPinPadrao: Boolean(escolaInfo && escolaInfo.mostrar_dica_pin_padrao),
+    },
+    modoDemonstracao: Boolean(base.modoDemonstracao),
+    verbas: Array.isArray(base.verbas) ? base.verbas : [],
+    lancamentos: Array.isArray(base.lancamentos) ? base.lancamentos : [],
+    fornecedores: Array.isArray(base.fornecedores) ? base.fornecedores : [],
+  };
+}
+
+function aplicarTravasModulosCef() {
+  const pub = obterEscolaPublicaAtual();
+  document.querySelectorAll('[data-cef-mod]').forEach((node) => {
+    const mod = node.getAttribute('data-cef-mod');
+    node.hidden = !moduloCefAtivo(mod);
+  });
+
+  const bannerAviso = document.getElementById('banner-aviso-rpmaster');
+  const txtAviso = document.getElementById('texto-aviso-rpmaster');
+  if (bannerAviso && txtAviso) {
+    const aviso = pub && pub.aviso_rpmaster ? String(pub.aviso_rpmaster).trim() : '';
+    if (aviso) {
+      txtAviso.textContent = aviso;
+      bannerAviso.hidden = false;
+    } else {
+      bannerAviso.hidden = true;
+    }
+  }
+
+  const bannerSup = document.getElementById('banner-suporte-rpmaster');
+  if (bannerSup) {
+    bannerSup.hidden = !estaEmImpersonacao();
+  }
+
+  const blocoPinAtual = document.getElementById('bloco-pin-atual');
+  const blocoTrocaPin = document.getElementById('bloco-troca-pin');
+  if (blocoPinAtual) blocoPinAtual.hidden = !modoNuvemAtivo() || estaEmImpersonacao();
+  if (blocoTrocaPin) blocoTrocaPin.hidden = estaEmImpersonacao();
+}
+
+let _syncEmAndamento = false;
+let _ultimoPullFocus = 0;
+
+async function sincronizarComNuvem(estadoAtual, meta = null) {
+  if (!modoNuvemAtivo() || !obterTokenNuvemAtivo()) return { ok: true };
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    mostrarAviso('Sem internet: reconecte para salvar os dados da escola na nuvem com segurança.', 'erro');
+    return { ok: false, offline: true };
+  }
+  _syncEmAndamento = true;
+  try {
+    const res = await salvarEstadoNuvem(estadoAtual, meta);
+    if (!res || !res.ok) {
+      if (res && res.conflict) {
+        mostrarAviso('Outro aparelho atualizou os dados. Recarregando versão mais recente...', 'erro');
+        await recarregarDaNuvem();
+      } else if (res && res.suspended) {
+        mostrarAviso(res.error || 'Sistema suspenso pelo RPMASTER.', 'erro');
+        await sairParaTelaAcesso();
+      } else {
+        mostrarAviso((res && res.error) || 'Não foi possível salvar na nuvem.', 'erro');
+      }
+      return res || { ok: false };
+    }
+    return res;
+  } catch (err) {
+    mostrarAviso(err.message || 'Erro ao sincronizar com a nuvem.', 'erro');
+    return { ok: false, error: err.message };
+  } finally {
+    _syncEmAndamento = false;
+  }
+}
+
+async function recarregarDaNuvem() {
+  if (!modoNuvemAtivo() || !obterTokenNuvemAtivo()) return false;
+  try {
+    const res = await buscarEstadoNuvem();
+    if (!res || !res.ok) {
+      if (res && res.suspended) {
+        await sairParaTelaAcesso();
+        exibirBloqueioTelaAcesso(res.error || 'Sistema suspenso pelo RPMASTER.');
+      }
+      return false;
+    }
+    if (res.escola) aplicarIdentidadeVisualEscola(res.escola);
+    estadoUI.dados = normalizarEstadoNuvem(res.estado, res.escola);
+    salvarEstadoEscola(estadoUI.dados, { ignorarNuvem: true });
+    el.subtituloEscola.textContent = estadoUI.dados.escola.nome;
+    el.topoNomeEscola.textContent = estadoUI.dados.escola.nome;
+    aplicarTravasModulosCef();
+    renderizarTudo();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function verificarPinCompleto() {
+  if (modoNuvemAtivo()) {
+    const pin = estadoUI.pinDigitado;
+    estadoUI.pinDigitado = '';
+    atualizarBolinhasPin();
+    try {
+      const res = await entrarComPinNuvem(pin, el.chkLembrar.checked);
+      if (!res || !res.ok) {
+        if (res && res.suspended) {
+          exibirBloqueioTelaAcesso(res.error || 'Sistema suspenso pelo RPMASTER.');
+        } else {
+          mostrarErroPin((res && res.error) || 'Senha incorreta. Tente novamente.');
+        }
+        return;
+      }
+      limparErroPin();
+      if (res.escola) aplicarIdentidadeVisualEscola(res.escola);
+      estadoUI.dados = normalizarEstadoNuvem(res.estado, res.escola);
+      salvarEstadoEscola(estadoUI.dados, { ignorarNuvem: true });
+      abrirAplicacaoPrincipal();
+      mostrarAviso('Bem-vindo(a)! Dados sincronizados na nuvem com segurança.');
+    } catch (err) {
+      mostrarErroPin(err.message || 'Erro de conexão com o servidor.');
+    }
+    return;
+  }
+
   const segundosBloqueio = controleTentativas.segundosRestantesBloqueio();
   if (segundosBloqueio > 0) {
     mostrarErroPin(`Muitas tentativas erradas. Aguarde ${segundosBloqueio} segundos para tentar de novo.`);
@@ -328,15 +505,21 @@ function abrirAplicacaoPrincipal() {
   el.telaAcesso.hidden = true;
   el.appPrincipal.hidden = false;
   el.topoNomeEscola.textContent = estadoUI.dados.escola.nome;
+  aplicarTravasModulosCef();
   renderizarTudo();
 }
 
-function sairParaTelaAcesso() {
+async function sairParaTelaAcesso() {
+  if (modoNuvemAtivo()) {
+    await sairSessaoNuvem();
+  }
   definirSessaoLembrada(false);
   estadoUI.pinDigitado = '';
   atualizarBolinhasPin();
   limparErroPin();
-  el.subtituloEscola.textContent = estadoUI.dados.escola.nome;
+  if (estadoUI.dados && estadoUI.dados.escola) {
+    el.subtituloEscola.textContent = estadoUI.dados.escola.nome;
+  }
   atualizarDicaPinAcesso();
   el.appPrincipal.hidden = true;
   el.telaAcesso.hidden = false;
@@ -1488,15 +1671,25 @@ function configurarEventos() {
   inputArquivoBackup.addEventListener('change', (e) => {
     const arquivo = e.target.files?.[0];
     if (!arquivo) return;
+    if (!moduloCefAtivo('backup')) {
+      mostrarAviso('O módulo de Cópia de Segurança está desativado neste plano.', 'erro');
+      return;
+    }
 
     abrirConfirmacao(
       'Recuperar esta Cópia de Segurança?',
-      'Os dados atuais deste aparelho serão substituídos pelos dados salvos no arquivo escolhido. Deseja continuar?',
+      'Os dados atuais serão substituídos pelos dados salvos no arquivo escolhido. Deseja continuar?',
       async () => {
         try {
           const resultado = await lerEValidarArquivoBackup(arquivo);
           estadoUI.dados = resultado.dados;
-          salvarEstadoEscola(estadoUI.dados);
+          if (modoNuvemAtivo()) {
+            const syncRes = await sincronizarComNuvem(estadoUI.dados);
+            if (!syncRes || !syncRes.ok) return;
+            salvarEstadoEscola(estadoUI.dados, { ignorarNuvem: true });
+          } else {
+            salvarEstadoEscola(estadoUI.dados);
+          }
           estadoUI.verbaSelecionadaId = 'todas';
           el.subtituloEscola.textContent = estadoUI.dados.escola.nome;
           atualizarDicaPinAcesso();
@@ -1515,6 +1708,8 @@ function configurarEventos() {
   el.formConfigEscola.addEventListener('submit', async (e) => {
     e.preventDefault();
     const nome = el.inputConfigNomeEscola.value.trim();
+    const pinAtualEl = document.getElementById('input-pin-atual');
+    const pinAtual = pinAtualEl ? pinAtualEl.value.trim() : '';
     const novoPin = el.inputConfigNovoPin.value.trim();
     const confirmaPin = el.inputConfigConfirmaPin.value.trim();
 
@@ -1527,14 +1722,32 @@ function configurarEventos() {
         mostrarAviso('As duas senhas digitadas não são iguais. Digite de novo.', 'erro');
         return;
       }
+      if (modoNuvemAtivo() && !/^\d{4}$/.test(pinAtual)) {
+        mostrarAviso('Digite sua senha atual de 4 números para confirmar a troca.', 'erro');
+        return;
+      }
     }
 
     try {
-      await atualizarConfiguracoesEscola(estadoUI.dados, {
-        nomeEscola: nome,
-        novoPin: novoPin || null,
-      });
+      if (modoNuvemAtivo()) {
+        estadoUI.dados.escola.nome = nome;
+        const meta = { nome_escola: nome };
+        if (novoPin) {
+          meta.pin_atual = pinAtual;
+          meta.novo_pin = novoPin;
+        }
+        const syncRes = await sincronizarComNuvem(estadoUI.dados, meta);
+        if (!syncRes || !syncRes.ok) return;
+        salvarEstadoEscola(estadoUI.dados, { ignorarNuvem: true });
+        if (pinAtualEl) pinAtualEl.value = '';
+      } else {
+        await atualizarConfiguracoesEscola(estadoUI.dados, {
+          nomeEscola: nome,
+          novoPin: novoPin || null,
+        });
+      }
       el.subtituloEscola.textContent = estadoUI.dados.escola.nome;
+      el.topoNomeEscola.textContent = estadoUI.dados.escola.nome;
       atualizarDicaPinAcesso();
       renderizarTudo();
       fecharModalConfigEscola();
@@ -1860,14 +2073,69 @@ function configurarEventos() {
 }
 
 async function iniciar() {
+  consumirImpersonacaoUrl();
   estadoUI.dados = await carregarEstadoEscola();
-  el.subtituloEscola.textContent = estadoUI.dados.escola.nome;
-  atualizarDicaPinAcesso();
   aplicarPreferenciaLetra(obterPreferenciaLetraMaior());
   configurarEventos();
 
-  if (obterSessaoLembrada()) {
-    abrirAplicacaoPrincipal();
+  const btnDispensarAviso = document.getElementById('btn-dispensar-aviso-rpmaster');
+  if (btnDispensarAviso) {
+    btnDispensarAviso.addEventListener('click', () => {
+      document.getElementById('banner-aviso-rpmaster').hidden = true;
+    });
+  }
+  const btnEncerrarSup = document.getElementById('btn-encerrar-suporte-rpmaster');
+  if (btnEncerrarSup) {
+    btnEncerrarSup.addEventListener('click', sairParaTelaAcesso);
+  }
+
+  if (modoNuvemAtivo()) {
+    const slug = obterSlugEscolaUrl();
+    registrarSincronizadorNuvem((novoEstado) => {
+      sincronizarComNuvem(novoEstado);
+    });
+
+    try {
+      const info = await obterInfoPublicaEscola(slug);
+      if (!info || !info.ok || !info.escola) {
+        el.subtituloEscola.textContent = 'RPMASTER • Caixa Escolar';
+        exibirBloqueioTelaAcesso('Escola não localizada para este endereço. Verifique o link fornecido pelo administrador.');
+        return;
+      }
+
+      aplicarIdentidadeVisualEscola(info.escola);
+      el.subtituloEscola.textContent = info.escola.nome_escola;
+      atualizarDicaPinAcesso();
+
+      if ((!info.escola.ativo || info.escola.status_assinatura === 'suspenso') && !estaEmImpersonacao()) {
+        const motivo = info.escola.bloqueio_motivo ? ` Motivo: ${info.escola.bloqueio_motivo}` : ' Entre em contato com o suporte RPMASTER.';
+        exibirBloqueioTelaAcesso(`O sistema de ${info.escola.nome_escola} encontra-se temporariamente suspenso.${motivo}`);
+        return;
+      }
+
+      if (obterTokenNuvemAtivo()) {
+        const okPull = await recarregarDaNuvem();
+        if (okPull) {
+          abrirAplicacaoPrincipal();
+        }
+      }
+
+      window.addEventListener('focus', () => {
+        const agora = Date.now();
+        if (!_syncEmAndamento && obterTokenNuvemAtivo() && agora - _ultimoPullFocus > 10000) {
+          _ultimoPullFocus = agora;
+          recarregarDaNuvem();
+        }
+      });
+    } catch (err) {
+      mostrarErroPin(err.message || 'Não foi possível conectar ao servidor da escola.');
+    }
+  } else {
+    el.subtituloEscola.textContent = estadoUI.dados.escola.nome;
+    atualizarDicaPinAcesso();
+    if (obterSessaoLembrada()) {
+      abrirAplicacaoPrincipal();
+    }
   }
 
   // Registra o modo aplicativo offline (PWA) quando aberto em HTTPS ou localhost

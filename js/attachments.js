@@ -6,9 +6,16 @@
  * - Valida rigorosamente tipo e tamanho do arquivo (Segurança)
  */
 
-const NOME_BANCO = 'CaixaEscolarNotinhasDB';
+import { obterSlugEscolaUrl } from './rpmaster_bridge.js';
+
+const NOME_BANCO_BASE = 'CaixaEscolarNotinhasDB';
 const VERSAO_BANCO = 1;
 const STORE_ANEXOS = 'anexos';
+
+function obterNomeBancoIsolado() {
+  const slug = obterSlugEscolaUrl();
+  return slug ? `CaixaEscolarNotinhasDB__${slug}` : NOME_BANCO_BASE;
+}
 
 const TIPOS_PERMITIDOS = new Set([
   'image/jpeg',
@@ -29,7 +36,7 @@ function abrirBanco() {
       return;
     }
 
-    const req = indexedDB.open(NOME_BANCO, VERSAO_BANCO);
+    const req = indexedDB.open(obterNomeBancoIsolado(), VERSAO_BANCO);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE_ANEXOS)) {

@@ -2200,3 +2200,77 @@ select:focus-visible {
     justify-content: center;
   }
 }
+
+/* ==========================================================================
+   GOVERNANÇA MULTI-ESCOLA RPMASTER (AVISOS, SUPORTE E BLOQUEIO)
+   ========================================================================== */
+.banner-rpmaster {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  background: #1e1b4b;
+  color: #e0e7ff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(34, 211, 238, 0.35);
+}
+.banner-rpmaster[hidden],
+.banner-suporte-rpmaster[hidden],
+.aviso-bloqueio-escola[hidden] {
+  display: none !important;
+}
+.banner-rpmaster-tag {
+  background: rgba(34, 211, 238, 0.2);
+  color: #67e8f9;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+.banner-rpmaster-fechar {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.banner-suporte-rpmaster {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  background: #78350f;
+  color: #fef3c7;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.banner-suporte-btn {
+  background: #fbbf24;
+  color: #451a03;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.aviso-bloqueio-escola {
+  margin: 18px 0;
+  padding: 18px;
+  border-radius: 14px;
+  background: #fef2f2;
+  border: 2px solid #fca5a5;
+  color: #991b1b;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+}
