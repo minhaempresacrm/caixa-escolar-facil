@@ -1,0 +1,10 @@
+{
+  "name": "Caixa Escolar Fácil",
+  "short_name": "Caixa Escolar",
+  "description": "Sistema simples e seguro para controle de verbas e prestação de contas de escolas públicas.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#1E3A8A",
+  "lang": "pt-BR"
+}

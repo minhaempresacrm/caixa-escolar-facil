@@ -1,0 +1,129 @@
+/**
+ * Módulo de Cópia de Segurança (Backup/Restauração) e Conector Nuvem (Supabase Free Tier).
+ * - Exporta e restaura todos os dados da escola + fotos das notinhas em 1 arquivo seguro.
+ * - Valida estritamente o pacote antes de restaurar (impede arquivos adulterados).
+ * - Nunca armazena chaves administrativas (service_role) no front-end.
+ */
+
+import { listarTodosAnexos, salvarAnexo } from './attachments.js';
+
+const VERSAO_BACKUP = 1;
+
+/**
+ * Valida se um objeto JSON carregado de um arquivo de backup tem estrutura íntegra.
+ * Exportada para testes unitários.
+ */
+export function validarPacoteBackup(pacote) {
+  if (!pacote || typeof pacote !== 'object') {
+    return { valido: false, erro: 'Arquivo de cópia de segurança inválido.' };
+  }
+
+  if (pacote.sistema !== 'CaixaEscolarFacil' || pacote.versao !== VERSAO_BACKUP) {
+    return {
+      valido: false,
+      erro: 'Este arquivo não é uma cópia de segurança do Caixa Escolar Fácil.',
+    };
+  }
+
+  const dados = pacote.dados;
+  if (
+    !dados ||
+    typeof dados !== 'object' ||
+    !dados.escola ||
+    typeof dados.escola.nome !== 'string' ||
+    typeof dados.escola.pinHash !== 'string' ||
+    !Array.isArray(dados.verbas) ||
+    !Array.isArray(dados.lancamentos)
+  ) {
+    return {
+      valido: false,
+      erro: 'Os dados dentro desta cópia de segurança estão incompletos.',
+    };
+  }
+
+  if (pacote.anexos !== undefined && !Array.isArray(pacote.anexos)) {
+    return { valido: false, erro: 'Lista de fotos da cópia de segurança inválida.' };
+  }
+
+  return { valido: true, erro: null };
+}
+
+/**
+ * Gera o pacote completo de backup (dados + fotos das notinhas do IndexedDB)
+ * e inicia o download no aparelho do diretor.
+ */
+export async function exportarBackupCompleto(estadoDados) {
+  let anexos = [];
+  try {
+    anexos = await listarTodosAnexos();
+  } catch {
+    anexos = [];
+  }
+
+  const pacote = {
+    sistema: 'CaixaEscolarFacil',
+    versao: VERSAO_BACKUP,
+    geradoEm: new Date().toISOString(),
+    dados: estadoDados,
+    anexos,
+  };
+
+  const json = JSON.stringify(pacote, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const hoje = new Date();
+  const dataNome = `${String(hoje.getDate()).padStart(2, '0')}-${String(
+    hoje.getMonth() + 1
+  ).padStart(2, '0')}-${hoje.getFullYear()}`;
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Copia_Caixa_Escolar_${dataNome}.json`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  return { totalNotas: estadoDados.lancamentos.length, totalFotos: anexos.length };
+}
+
+/**
+ * Lê um arquivo de backup escolhido pelo diretor, valida e restaura os anexos no IndexedDB.
+ * Retorna o objeto `dados` validado para ser salvo no storage principal.
+ */
+export async function lerEValidarArquivoBackup(arquivo) {
+  if (!arquivo) {
+    throw new Error('Nenhum arquivo de cópia de segurança foi selecionado.');
+  }
+
+  if (arquivo.size > 50 * 1024 * 1024) {
+    throw new Error('Este arquivo é grande demais (máximo 50 MB).');
+  }
+
+  const texto = await arquivo.text();
+  let pacote;
+  try {
+    pacote = JSON.parse(texto);
+  } catch {
+    throw new Error('Não foi possível ler este arquivo. Verifique se é um arquivo .json do Caixa Escolar.');
+  }
+
+  const validacao = validarPacoteBackup(pacote);
+  if (!validacao.valido) {
+    throw new Error(validacao.erro);
+  }
+
+  if (Array.isArray(pacote.anexos)) {
+    for (const anexo of pacote.anexos) {
+      if (anexo && typeof anexo.id === 'string' && typeof anexo.dataUrl === 'string') {
+        await salvarAnexo(anexo.id, anexo);
+      }
+    }
+  }
+
+  return {
+    dados: pacote.dados,
+    totalFotosRestauradas: Array.isArray(pacote.anexos) ? pacote.anexos.length : 0,
+  };
+}

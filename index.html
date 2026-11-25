@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://*.supabase.co; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self';" />
+  <title>Caixa Escolar Fácil — Gestão de Verbas Escolares</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <!-- AVISO AMIGÁVEL NO TOPO -->
+  <div id="aviso-sistema" class="aviso-sistema" role="status" aria-live="polite" hidden></div>
+
+  <!-- =========================================================
+       TELA 0: ENTRADA SEGURA COM SENHA DE 4 NÚMEROS
+       ========================================================= -->
+  <section id="tela-acesso" class="tela-acesso" aria-label="Entrada no sistema">
+    <div class="cartao-acesso">
+      <div class="marca-acesso">
+        <div class="emblema-sistema" aria-hidden="true">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 21h18"/><path d="M5 21V9l7-4 7 4v12"/><path d="M9 21v-6h6v6"/><path d="M12 5V2"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="titulo-acesso">Caixa Escolar Fácil</h1>
+          <p id="subtitulo-escola" class="subtitulo-acesso">E.M. Prof. Maria Helena</p>
+        </div>
+      </div>
+
+      <p id="instrucao-pin" class="instrucao-pin">Digite sua senha de 4 números para entrar</p>
+
+      <!-- 4 Marcadores Visuais do PIN -->
+      <div class="pin-bolinhas" aria-label="Senha digitada">
+        <span class="pin-bolinha" data-pos="0"></span>
+        <span class="pin-bolinha" data-pos="1"></span>
+        <span class="pin-bolinha" data-pos="2"></span>
+        <span class="pin-bolinha" data-pos="3"></span>
+      </div>
+
+      <p id="erro-pin" class="mensagem-erro" role="alert" hidden></p>
+
+      <!-- Teclado Numérico Estilo Bancário -->
+      <div class="teclado-pin" role="group" aria-label="Teclado numérico da senha">
+        <button type="button" class="tecla-pin" data-digito="1">1</button>
+        <button type="button" class="tecla-pin" data-digito="2">2</button>
+        <button type="button" class="tecla-pin" data-digito="3">3</button>
+        <button type="button" class="tecla-pin" data-digito="4">4</button>
+        <button type="button" class="tecla-pin" data-digito="5">5</button>
+        <button type="button" class="tecla-pin" data-digito="6">6</button>
+        <button type="button" class="tecla-pin" data-digito="7">7</button>
+        <button type="button" class="tecla-pin" data-digito="8">8</button>
+        <button type="button" class="tecla-pin" data-digito="9">9</button>
+        <button type="button" class="tecla-pin tecla-secundaria" id="btn-limpar-pin">Limpar</button>
+        <button type="button" class="tecla-pin" data-digito="0">0</button>
+        <button type="button" class="tecla-pin tecla-secundaria" id="btn-apagar-pin">Apagar</button>
+      </div>
+
+      <label class="opcao-lembrar">
+        <input type="checkbox" id="chk-lembrar-aparelho" checked />
+        <span>Manter conectado neste aparelho</span>
+      </label>
+
+      <div class="dica-acesso">
+        <p id="texto-dica-pin">
+          <strong>Acesso inicial de teste:</strong> digite <strong>1 2 3 4</strong> para abrir o sistema.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================
+       APLICAÇÃO PRINCIPAL (LAYOUT EXECUTIVO COM MENU LATERAL)
+       ========================================================= -->
+  <div id="app-principal" class="app-layout" hidden>
+    <!-- BARRA LATERAL PROFISSIONAL (NO CELULAR VIRA BARRA SUPERIOR COMPACTA) -->
+    <aside class="barra-lateral" aria-label="Menu principal">
+      <div class="lateral-marca">
+        <div class="emblema-pequeno" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 21h18"/><path d="M5 21V9l7-4 7 4v12"/><path d="M9 21v-6h6v6"/><path d="M12 5V2"/>
+          </svg>
+        </div>
+        <div>
+          <span class="marca-nome">Caixa Escolar</span>
+          <span class="marca-sub">Gestão de Verbas</span>
+        </div>
+      </div>
+
+      <nav class="menu-principal">
+        <button type="button" class="btn-menu ativo" data-tela="resumo">
+          <svg class="icone-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          <span>Resumo do Dinheiro</span>
+        </button>
+
+        <button type="button" class="btn-menu" data-tela="lancar">
+          <svg class="icone-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+          <span>Anotar Nota</span>
+        </button>
+
+        <button type="button" class="btn-menu" data-tela="cadastros">
+          <svg class="icone-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 9l1.5-5h15L21 9"/><path d="M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9"/><path d="M9 21v-7h6v7"/>
+          </svg>
+          <span>Fornecedores</span>
+        </button>
+      </nav>
+
+      <div class="lateral-rodape">
+        <button type="button" id="btn-config-escola" class="btn-lateral-sec">
+          <svg class="icone-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span>Escola, Senha e Cópia</span>
+        </button>
+
+        <button type="button" id="btn-sair" class="btn-lateral-sair">
+          <svg class="icone-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          <span>Sair com Segurança</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- COLUNA DIREITA: TOPO LIMPO + CONTEÚDO -->
+    <div class="area-direita">
+      <header class="topo-limpo">
+        <div class="topo-escola-info">
+          <h1 id="topo-nome-escola" class="topo-titulo">E.M. Prof. Maria Helena</h1>
+          <span class="selo-protegido">Dados Protegidos</span>
+        </div>
+
+        <div class="topo-acoes">
+          <button type="button" id="btn-aumentar-letra" class="btn-topo-claro" title="Aumentar ou normalizar o tamanho das letras">
+            <svg class="icone-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+            </svg>
+            <span id="texto-btn-letra">Letra Maior</span>
+          </button>
+        </div>
+      </header>
+
+      <main class="conteudo-principal">
+        <!-- =====================================================
+             TELA 1: RESUMO DO DINHEIRO E ABAS POR VERBA
+             ===================================================== -->
+        <section id="tela-resumo" aria-label="Resumo do Dinheiro">
+          <!-- Faixa discreta de Demonstração -->
+          <div id="faixa-exemplo" class="faixa-exemplo" hidden>
+            <div>
+              <strong>Dados de Demonstração:</strong> exibindo exemplos escolares para você conhecer o sistema.
+            </div>
+            <button type="button" id="btn-limpar-exemplos" class="btn-secundario-pequeno">
+              Começar do Zero (Limpar Exemplos)
+            </button>
+          </div>
+
+          <!-- ABAS SEPARADAS POR VERBA -->
+          <div class="secao-bloco">
+            <div class="cabecalho-bloco">
+              <h2 class="titulo-secao">Verbas da Escola</h2>
+              <p class="subtitulo-secao">Selecione uma aba para ver o dinheiro e as notas somente daquela verba.</p>
+            </div>
+            <div id="lista-abas-verbas" class="abas-verbas" role="tablist" aria-label="Abas de Verbas da Escola">
+              <!-- Preenchido dinamicamente por js/app.js -->
+            </div>
+          </div>
+
+          <!-- 3 CARTÕES EXECUTIVOS DE DINHEIRO -->
+          <div class="secao-bloco">
+            <div class="cabecalho-resumo-acoes">
+              <h2 id="titulo-verba-atual" class="titulo-secao">Resumo: Todas as Verbas da Escola</h2>
+              <div class="acoes-principais-duplas">
+                <button type="button" id="btn-atalho-gasto" class="btn-acao-destaque btn-gasto">
+                  <svg class="icone-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+                  </svg>
+                  <span>Anotar Gasto (Com Notinha)</span>
+                </button>
+                <button type="button" id="btn-atalho-entrada" class="btn-acao-destaque btn-entrada">
+                  <svg class="icone-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+                  </svg>
+                  <span>Colocar Dinheiro na Verba</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="grade-cartoes-dinheiro">
+              <article class="cartao-dinheiro cartao-entrada">
+                <div class="cartao-topo">
+                  <span class="cartao-rotulo">DINHEIRO EM CAIXA (ENTROU)</span>
+                  <span class="circulo-icone icone-verde" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+                    </svg>
+                  </span>
+                </div>
+                <p id="valor-total-entradas" class="cartao-valor">R$ 0,00</p>
+                <p class="cartao-ajuda">Total recebido nesta verba</p>
+              </article>
+
+              <article class="cartao-dinheiro cartao-gasto">
+                <div class="cartao-topo">
+                  <span class="cartao-rotulo">TOTAL GASTO (NOTAS)</span>
+                  <span class="circulo-icone icone-vermelho" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+                    </svg>
+                  </span>
+                </div>
+                <p id="valor-total-gastos" class="cartao-valor">R$ 0,00</p>
+                <p class="cartao-ajuda">Soma de todas as compras anotadas</p>
+              </article>
+
+              <article id="cartao-sobrando" class="cartao-dinheiro cartao-sobrando">
+                <div class="cartao-topo">
+                  <span class="cartao-rotulo">DINHEIRO SOBRANDO AGORA</span>
+                  <span class="circulo-icone icone-azul" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+                    </svg>
+                  </span>
+                </div>
+                <p id="valor-sobrando" class="cartao-valor valor-destaque">R$ 0,00</p>
+                <p id="texto-situacao-saldo" class="cartao-ajuda">Saldo livre disponível para usar</p>
+              </article>
+            </div>
+          </div>
+
+          <!-- HISTÓRICO FÁCIL DE LER EM CARTÕES -->
+          <div class="secao-bloco">
+            <div class="barra-ferramentas-historico">
+              <button type="button" id="btn-alternar-filtros" class="btn-ferramenta">
+                <svg class="icone-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                </svg>
+                <span id="texto-btn-filtros">Abrir Filtros e Busca</span>
+              </button>
+
+              <div class="botoes-compartilhar-duplos">
+                <button type="button" id="btn-mandar-whatsapp" class="btn-ferramenta btn-whatsapp">
+                  <svg class="icone-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                  </svg>
+                  <span>Enviar no WhatsApp</span>
+                </button>
+                <button type="button" id="btn-imprimir-relatorio" class="btn-ferramenta btn-imprimir">
+                  <svg class="icone-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+                  </svg>
+                  <span>Imprimir / Salvar PDF</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- PAINEL DE FILTROS DESCOMPLICADO -->
+            <div id="painel-filtros" class="painel-filtros" hidden>
+              <h3 class="titulo-filtros">Filtrar Notas da Verba</h3>
+              <div class="grade-filtros-campos">
+                <div>
+                  <label for="filtro-ordem" class="rotulo-campo-filtro">Ordenar por:</label>
+                  <select id="filtro-ordem" class="campo-select-grande">
+                    <option value="recentes">Mais recentes primeiro</option>
+                    <option value="antigas">Mais antigas primeiro</option>
+                    <option value="maior-valor">Do maior valor para o menor</option>
+                    <option value="menor-valor">Do menor valor para o maior</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label for="filtro-valor-min" class="rotulo-campo-filtro">Gastos maiores que (R$):</label>
+                  <input id="filtro-valor-min" type="text" inputmode="numeric" class="campo-texto-grande" placeholder="Ex: 100,00" />
+                </div>
+
+                <div>
+                  <label for="filtro-fornecedor" class="rotulo-campo-filtro">Fornecedor / Loja:</label>
+                  <select id="filtro-fornecedor" class="campo-select-grande">
+                    <option value="todos">Todos os fornecedores</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label for="filtro-comprovante" class="rotulo-campo-filtro">Situação da Notinha:</label>
+                  <select id="filtro-comprovante" class="campo-select-grande">
+                    <option value="todos">Todas as notas</option>
+                    <option value="com-foto">Apenas com notinha anexada</option>
+                    <option value="sem-foto">Apenas pendentes de notinha</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="botoes-acao-filtros">
+                <button type="button" id="btn-limpar-filtros" class="btn-voltar">
+                  Limpar Filtros
+                </button>
+              </div>
+            </div>
+
+            <div class="cabecalho-historico">
+              <h2 class="titulo-secao">Histórico de Notas</h2>
+              <p id="contador-notas" class="contador-notas">0 notas encontradas</p>
+            </div>
+
+            <div id="lista-historico" class="lista-cartoes-notas">
+              <!-- Preenchido dinamicamente por js/app.js -->
+            </div>
+          </div>
+        </section>
+
+        <!-- =====================================================
+             TELA 2: ANOTAR NOTA (GASTO OU ENTRADA + FOTO DA NOTINHA)
+             ===================================================== -->
+        <section id="tela-lancar" aria-label="Anotar Nota" hidden>
+          <div class="barra-voltar">
+            <button type="button" class="btn-voltar" data-voltar="resumo">
+              <svg class="icone-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+              </svg>
+              <span>Voltar para o Resumo</span>
+            </button>
+          </div>
+
+          <form id="form-lancar-nota" class="cartao-formulario" novalidate>
+            <h2 id="titulo-tela-lancar" class="titulo-formulario">Anotar um Gasto (Com Notinha)</h2>
+
+            <div class="seletor-tipo-nota" role="group" aria-label="Tipo de anotação">
+              <button type="button" id="btn-tipo-gasto" class="btn-tipo ativo-gasto">
+                <svg class="icone-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+                </svg>
+                <span>Anotar Gasto (Saiu Dinheiro)</span>
+              </button>
+              <button type="button" id="btn-tipo-entrada" class="btn-tipo">
+                <svg class="icone-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+                </svg>
+                <span>Colocar Dinheiro (Entrou)</span>
+              </button>
+            </div>
+
+            <div class="bloco-passo">
+              <label for="input-valor-nota" class="rotulo-passo">1. Qual foi o valor em Reais?</label>
+              <div class="campo-dinheiro-envolve">
+                <span class="prefixo-reais" aria-hidden="true">R$</span>
+                <input
+                  id="input-valor-nota"
+                  type="text"
+                  inputmode="numeric"
+                  class="campo-valor-gigante"
+                  placeholder="0,00"
+                  autocomplete="off"
+                  required
+                />
+              </div>
+              <p class="ajuda-campo">Digite apenas os números. Exemplo: para R$ 150,50 digite 15050.</p>
+            </div>
+
+            <div class="bloco-passo">
+              <p class="rotulo-passo">2. De qual Verba é este dinheiro?</p>
+              <div id="grade-verbas-formulario" class="grade-botoes-escolha" role="radiogroup" aria-label="Escolher verba"></div>
+            </div>
+
+            <div class="bloco-passo">
+              <label for="input-descricao-nota" id="rotulo-motivo-nota" class="rotulo-passo">
+                3. O que foi comprado? (Escolha uma opção rápida ou escreva)
+              </label>
+              <div id="grade-atalhos-motivo" class="grade-atalhos-rapidos"></div>
+              <input
+                id="input-descricao-nota"
+                type="text"
+                class="campo-texto-grande"
+                placeholder="Ex.: Compra de papel sulfite e canetas..."
+                maxlength="140"
+                required
+              />
+            </div>
+
+            <div class="bloco-passo grade-dupla-campos">
+              <div>
+                <label for="input-data-nota" class="rotulo-passo">4. Data da Nota</label>
+                <input id="input-data-nota" type="date" class="campo-texto-grande" required />
+              </div>
+              <div>
+                <label for="input-fornecedor-nota" class="rotulo-passo">Fornecedor / Mercado (Opcional)</label>
+                <input
+                  id="input-fornecedor-nota"
+                  type="text"
+                  list="lista-sugestoes-fornecedores"
+                  class="campo-texto-grande"
+                  placeholder="Ex.: Papelaria Central"
+                  maxlength="80"
+                />
+                <datalist id="lista-sugestoes-fornecedores"></datalist>
+              </div>
+            </div>
+
+            <div class="bloco-passo bloco-anexo-notinha" id="secao-anexo-formulario">
+              <p class="rotulo-passo">5. Foto da Notinha ou Comprovante (Opcional, mas recomendado)</p>
+              <div class="botoes-anexo-duplos">
+                <button type="button" id="btn-tirar-foto-camera" class="btn-anexo btn-anexo-camera">
+                  <svg class="icone-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
+                  </svg>
+                  <span>Tirar Foto da Notinha (Câmera)</span>
+                </button>
+                <button type="button" id="btn-escolher-arquivo" class="btn-anexo btn-anexo-arquivo">
+                  <svg class="icone-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  <span>Escolher Foto ou PDF Salvo</span>
+                </button>
+              </div>
+
+              <input id="input-camera-notinha" type="file" accept="image/*" capture="environment" hidden />
+              <input id="input-arquivo-notinha" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden />
+
+              <div id="preview-notinha-box" class="preview-notinha-box" hidden>
+                <div id="preview-notinha-conteudo" class="preview-notinha-conteudo"></div>
+                <div class="preview-notinha-acoes">
+                  <button type="button" id="btn-zoom-preview" class="btn-primario-grande">
+                    Aumentar / Dar Zoom
+                  </button>
+                  <button type="button" id="btn-remover-preview" class="btn-voltar">
+                    Trocar / Remover Foto
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="acoes-finais-formulario">
+              <button type="button" class="btn-voltar" data-voltar="resumo">
+                Voltar sem Salvar
+              </button>
+              <button type="submit" id="btn-salvar-nota" class="btn-gigante btn-salvar-verde">
+                <svg class="icone-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                </svg>
+                <span>SALVAR NOTA</span>
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <!-- =====================================================
+             TELA 3: FORNECEDORES E PRESTADORES DE SERVIÇO
+             ===================================================== -->
+        <section id="tela-cadastros" aria-label="Fornecedores" hidden>
+          <div class="barra-voltar">
+            <button type="button" class="btn-voltar" data-voltar="resumo">
+              <svg class="icone-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+              </svg>
+              <span>Voltar para o Resumo</span>
+            </button>
+          </div>
+
+          <div class="cartao-formulario">
+            <div class="cabecalho-bloco-cadastros">
+              <div>
+                <h2 class="titulo-formulario">Fornecedores e Prestadores de Serviço</h2>
+                <p class="subtitulo-formulario">Lojas, papelarias, mercados e prestadores onde a escola realiza compras.</p>
+              </div>
+              <button type="button" id="btn-abrir-novo-fornecedor" class="btn-primario-grande">
+                <svg class="icone-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span>Cadastrar Novo Fornecedor</span>
+              </button>
+            </div>
+
+            <div id="lista-fornecedores" class="lista-fornecedores-grade"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: CRIAR NOVA VERBA
+       ========================================================= -->
+  <div id="modal-nova-verba" class="modal-fundo" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-verba" hidden>
+    <div class="modal-caixa">
+      <h2 id="titulo-modal-verba" class="modal-titulo">Criar Nova Verba</h2>
+      <p class="modal-subtitulo">Exemplo: Festa Junina (APM), Emenda Parlamentar, Reforma da Quadra.</p>
+
+      <form id="form-nova-verba">
+        <div class="grupo-campo">
+          <label for="input-nome-verba" class="rotulo-grande">Nome da Verba</label>
+          <input id="input-nome-verba" type="text" class="campo-texto-grande" placeholder="Digite o nome da verba..." maxlength="40" required />
+        </div>
+
+        <div class="grupo-campo">
+          <label class="rotulo-grande">Categoria visual da verba:</label>
+          <div id="grade-icones-verba" class="grade-icones">
+            <button type="button" class="opcao-icone ativo" data-icone="escola">Escola / Geral</button>
+            <button type="button" class="opcao-icone" data-icone="merenda">Alimentação</button>
+            <button type="button" class="opcao-icone" data-icone="reparo">Manutenção</button>
+            <button type="button" class="opcao-icone" data-icone="livros">Pedagógico</button>
+            <button type="button" class="opcao-icone" data-icone="verba">Projetos / APM</button>
+            <button type="button" class="opcao-icone" data-icone="nota">Outra Verba</button>
+          </div>
+        </div>
+
+        <div class="modal-botoes">
+          <button type="button" id="btn-cancelar-verba" class="btn-voltar">Cancelar</button>
+          <button type="submit" class="btn-primario-grande">Salvar Nova Verba</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: CONFIRMAÇÃO SEGURA
+       ========================================================= -->
+  <div id="modal-confirmacao" class="modal-fundo" role="dialog" aria-modal="true" aria-labelledby="titulo-confirmacao" hidden>
+    <div class="modal-caixa">
+      <h2 id="titulo-confirmacao" class="modal-titulo">Confirmar ação</h2>
+      <p id="texto-confirmacao" class="modal-subtitulo"></p>
+      <div class="modal-botoes">
+        <button type="button" id="btn-confirmacao-nao" class="btn-voltar">Não, Voltar</button>
+        <button type="button" id="btn-confirmacao-sim" class="btn-perigo-grande">Sim, Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <input id="input-anexo-rapido" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden />
+
+  <!-- =========================================================
+       MODAL: VISUALIZAR NOTINHA COM ZOOM
+       ========================================================= -->
+  <div id="modal-visualizar-notinha" class="modal-fundo" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-notinha" hidden>
+    <div class="modal-caixa modal-notinha-grande">
+      <div class="modal-notinha-topo">
+        <h2 id="titulo-modal-notinha" class="modal-titulo">Comprovante / Notinha Salva</h2>
+        <button type="button" id="btn-fechar-notinha" class="btn-perigo-grande">Fechar</button>
+      </div>
+
+      <div id="controles-zoom-notinha" class="controles-zoom">
+        <button type="button" id="btn-zoom-mais" class="btn-primario-grande">Aumentar Zoom (+)</button>
+        <button type="button" id="btn-zoom-menos" class="btn-voltar">Diminuir (-)</button>
+        <button type="button" id="btn-zoom-normal" class="btn-voltar">Tamanho Normal</button>
+      </div>
+
+      <div id="area-imagem-notinha" class="area-imagem-notinha"></div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: ALERTA GENTIL "FALTOU A FOTO DA NOTINHA"
+       ========================================================= -->
+  <div id="modal-sem-notinha" class="modal-fundo" role="dialog" aria-modal="true" aria-labelledby="titulo-sem-notinha" hidden>
+    <div class="modal-caixa">
+      <h2 id="titulo-sem-notinha" class="modal-titulo">Faltou a foto da notinha</h2>
+      <p class="modal-subtitulo">
+        Você ainda não anexou a foto do comprovante deste gasto. Deseja tirar a foto agora ou salvar sem foto por enquanto?
+      </p>
+      <div class="modal-botoes modal-botoes-coluna">
+        <button type="button" id="btn-alerta-tirar-foto" class="btn-primario-grande">
+          Tirar ou Escolher Foto Agora
+        </button>
+        <button type="button" id="btn-alerta-salvar-sem-foto" class="btn-voltar">
+          Salvar Sem Foto por Enquanto
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: ESCOLA, SENHA E CÓPIA DE SEGURANÇA
+       ========================================================= -->
+  <div id="modal-config-escola" class="modal-fundo" role="dialog" aria-modal="true" aria-labelledby="titulo-config-escola" hidden>
+    <div class="modal-caixa">
+      <h2 id="titulo-config-escola" class="modal-titulo">Escola, Senha e Cópia de Segurança</h2>
+      <p class="modal-subtitulo">Atualize o nome da escola ou defina uma nova senha numérica de 4 dígitos.</p>
+
+      <form id="form-config-escola">
+        <div class="grupo-campo">
+          <label for="input-config-nome-escola" class="rotulo-grande">Nome da Escola</label>
+          <input id="input-config-nome-escola" type="text" class="campo-texto-grande" maxlength="80" required />
+        </div>
+
+        <div class="grupo-campo">
+          <label for="input-config-novo-pin" class="rotulo-grande">Nova Senha de 4 Números (opcional)</label>
+          <input id="input-config-novo-pin" type="password" inputmode="numeric" maxlength="4" pattern="\d{4}" class="campo-texto-grande" placeholder="Ex.: 4829" autocomplete="new-password" />
+        </div>
+
+        <div class="grupo-campo">
+          <label for="input-config-confirma-pin" class="rotulo-grande">Repita a Nova Senha</label>
+          <input id="input-config-confirma-pin" type="password" inputmode="numeric" maxlength="4" pattern="\d{4}" class="campo-texto-grande" placeholder="Repita os 4 números" autocomplete="new-password" />
+        </div>
+
+        <div class="modal-botoes">
+          <button type="button" id="btn-cancelar-config" class="btn-voltar">Cancelar</button>
+          <button type="submit" class="btn-primario-grande">Salvar Alterações</button>
+        </div>
+      </form>
+
+      <hr class="divisor-modal" />
+
+      <div class="bloco-backup-escola">
+        <h3 class="subtitulo-modal-secao">Cópia de Segurança dos Dados</h3>
+        <p class="modal-subtitulo">
+          Guarde uma cópia completa (notas e fotos) no computador ou pendrive, ou recupere uma cópia salva anteriormente.
+        </p>
+        <div class="modal-botoes modal-botoes-coluna">
+          <button type="button" id="btn-baixar-backup" class="btn-primario-grande btn-verde-solido">
+            Guardar Cópia de Segurança Agora
+          </button>
+          <button type="button" id="btn-restaurar-backup" class="btn-voltar">
+            Recuperar Cópia de Segurança Salva
+          </button>
+        </div>
+        <input id="input-arquivo-backup" type="file" accept="application/json,.json" hidden />
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       MODAL: CADASTRAR NOVO FORNECEDOR
+       ========================================================= -->
+  <div id="modal-novo-fornecedor" class="modal-fundo" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-fornecedor" hidden>
+    <div class="modal-caixa">
+      <h2 id="titulo-modal-fornecedor" class="modal-titulo">Cadastrar Novo Fornecedor</h2>
+      <p class="modal-subtitulo">Cadastre lojas, papelarias ou prestadores de serviço da escola.</p>
+
+      <form id="form-novo-fornecedor">
+        <div class="grupo-campo">
+          <label for="input-forn-nome" class="rotulo-grande">Nome da Loja ou Prestador</label>
+          <input id="input-forn-nome" type="text" class="campo-texto-grande" placeholder="Ex.: Papelaria Central Ltda" maxlength="80" required />
+        </div>
+
+        <div class="grupo-campo">
+          <label for="input-forn-tel" class="rotulo-grande">Telefone / WhatsApp (Opcional)</label>
+          <input id="input-forn-tel" type="tel" class="campo-texto-grande" placeholder="Ex.: (11) 99999-8888" maxlength="25" />
+        </div>
+
+        <div class="grupo-campo">
+          <label for="input-forn-obs" class="rotulo-grande">Observações / Ramo de atividade</label>
+          <input id="input-forn-obs" type="text" class="campo-texto-grande" placeholder="Ex.: Material de expediente e fotocópias" maxlength="120" />
+        </div>
+
+        <div class="modal-botoes">
+          <button type="button" id="btn-cancelar-fornecedor" class="btn-voltar">Cancelar</button>
+          <button type="submit" class="btn-primario-grande">Salvar Fornecedor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       FOLHA DE IMPRESSÃO / PRESTAÇÃO DE CONTAS EM PDF A4
+       ========================================================= -->
+  <div id="folha-impressao" class="folha-impressao" hidden>
+    <div class="folha-cabecalho">
+      <div>
+        <h1 id="relatorio-nome-escola" class="folha-titulo">Caixa Escolar Fácil</h1>
+        <h2 id="relatorio-nome-verba" class="folha-subtitulo">Demonstrativo de Prestação de Contas</h2>
+        <p id="relatorio-data-geracao" class="folha-meta"></p>
+      </div>
+    </div>
+
+    <div class="folha-resumo-quadro">
+      <div class="folha-coluna-valor">
+        <span>Dinheiro Recebido:</span>
+        <strong id="relatorio-total-entradas">R$ 0,00</strong>
+      </div>
+      <div class="folha-coluna-valor">
+        <span>Total Gasto:</span>
+        <strong id="relatorio-total-gastos">R$ 0,00</strong>
+      </div>
+      <div class="folha-coluna-valor">
+        <span>Saldo Restante:</span>
+        <strong id="relatorio-saldo-restante">R$ 0,00</strong>
+      </div>
+    </div>
+
+    <h3 class="folha-secao-titulo">Relação Detalhada das Notas e Comprovantes</h3>
+    <table class="folha-tabela">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Tipo</th>
+          <th>Descrição / Motivo</th>
+          <th>Fornecedor / Favorecido</th>
+          <th>Notinha</th>
+          <th style="text-align: right;">Valor (R$)</th>
+        </tr>
+      </thead>
+      <tbody id="relatorio-linhas-tabela"></tbody>
+    </table>
+
+    <div class="folha-assinaturas">
+      <div class="folha-linha-assinatura">
+        <div class="linha-traco"></div>
+        <strong>Diretor(a) Escolar</strong>
+        <span>Assinatura e Carimbo</span>
+      </div>
+      <div class="folha-linha-assinatura">
+        <div class="linha-traco"></div>
+        <strong>Conselho Escolar / Tesoureiro(a)</strong>
+        <span>Assinatura e Carimbo</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
