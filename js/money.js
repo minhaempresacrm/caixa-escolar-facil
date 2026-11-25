@@ -57,6 +57,9 @@ export function textoParaCentavos(entrada) {
 export function calcularResumoFinanceiro(lancamentos) {
   let entradasCentavos = 0;
   let gastosCentavos = 0;
+  let totalComprovadas = 0;
+  let totalPendentes = 0;
+  let maiorGastoCentavos = 0;
 
   for (const item of lancamentos) {
     const valor = Number.isInteger(item.valorCentavos) ? item.valorCentavos : 0;
@@ -64,13 +67,29 @@ export function calcularResumoFinanceiro(lancamentos) {
       entradasCentavos += valor;
     } else if (item.tipo === 'gasto') {
       gastosCentavos += valor;
+      if (valor > maiorGastoCentavos) {
+        maiorGastoCentavos = valor;
+      }
+      if (item.temNotinha) {
+        totalComprovadas += 1;
+      } else {
+        totalPendentes += 1;
+      }
     }
   }
+
+  const percentualGasto = entradasCentavos > 0
+    ? Math.min(100, Math.round((gastosCentavos / entradasCentavos) * 100))
+    : (gastosCentavos > 0 ? 100 : 0);
 
   return {
     entradasCentavos,
     gastosCentavos,
     saldoCentavos: entradasCentavos - gastosCentavos,
+    percentualGasto,
+    totalComprovadas,
+    totalPendentes,
+    maiorGastoCentavos,
   };
 }
 

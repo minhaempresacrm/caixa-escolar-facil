@@ -586,6 +586,163 @@ select:focus-visible {
 }
 
 /* ==========================================================================
+   TERMÔMETRO VISUAL DE VERBA E INDICADORES DE AUDITORIA
+   ========================================================================== */
+.trilho-progresso-verba {
+  width: 100%;
+  height: 8px;
+  background-color: var(--cor-borda);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 10px 0 8px;
+}
+
+.preenchimento-progresso {
+  height: 100%;
+  width: 0%;
+  background-color: var(--cor-azul);
+  border-radius: 999px;
+  transition: width 0.35s ease, background-color 0.25s ease;
+}
+
+.preenchimento-progresso.progresso-seguro {
+  background-color: #22C55E;
+}
+
+.preenchimento-progresso.progresso-alerta {
+  background-color: #F59E0B;
+}
+
+.preenchimento-progresso.progresso-estouro {
+  background-color: #EF4444;
+}
+
+.rodape-termometro-verba {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.texto-percentual {
+  font-weight: 700;
+  color: var(--cor-texto);
+}
+
+.grade-indicadores-auditoria {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.card-indicador {
+  background-color: #FFFFFF;
+  border: 1px solid var(--cor-borda);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: var(--sombra-cartao);
+}
+
+.indicador-titulo {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--cor-texto-suave);
+  margin-bottom: 6px;
+}
+
+.indicador-conteudo {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.indicador-numero {
+  font-size: 1.55rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.indicador-numero.positivo {
+  color: var(--cor-verde);
+}
+
+.indicador-numero.pendente {
+  color: #D97706;
+}
+
+.indicador-numero.neutro {
+  color: var(--cor-texto);
+  font-size: 1.35rem;
+}
+
+.indicador-legenda {
+  font-size: 0.88rem;
+  color: var(--cor-texto-suave);
+}
+
+/* Classificação PDDE (Custeio vs Capital) */
+.seletor-custeio-capital {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.btn-categoria-pdde {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1.5px solid var(--cor-borda-forte);
+  background-color: #F8FAFC;
+  color: var(--cor-texto);
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-categoria-pdde span {
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+}
+
+.btn-categoria-pdde:hover {
+  border-color: var(--cor-azul);
+  background-color: var(--cor-azul-claro);
+}
+
+.btn-categoria-pdde.ativo {
+  border-color: var(--cor-azul);
+  background-color: var(--cor-azul-claro);
+  box-shadow: 0 0 0 1px var(--cor-azul);
+}
+
+.selo-custeio-capital {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background-color: #F1F5F9;
+  color: #475569;
+  border: 1px solid #CBD5E1;
+}
+
+.selo-capital {
+  background-color: #FEF3C7;
+  color: #92400E;
+  border-color: #FDE68A;
+}
+
+/* ==========================================================================
    RESUMO DO DINHEIRO + AÇÕES PRINCIPAIS
    ========================================================================== */
 .cabecalho-resumo-acoes {
@@ -1707,6 +1864,11 @@ select:focus-visible {
 @media (max-width: 960px) {
   .app-layout {
     flex-direction: column;
+  }
+
+  .grade-indicadores-auditoria,
+  .seletor-custeio-capital {
+    grid-template-columns: 1fr;
   }
 
   .barra-lateral {

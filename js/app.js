@@ -81,6 +81,7 @@ const estadoUI = {
   // Formulário da Tela 2
   formTipo: 'gasto',
   formVerbaId: null,
+  formCategoriaPdde: 'custeio',
   anexoPendente: null,
   anexoOriginalId: null,
   notaEmEdicaoId: null,
@@ -112,7 +113,12 @@ const el = {
   valorGastos: document.getElementById('valor-total-gastos'),
   valorSobrando: document.getElementById('valor-sobrando'),
   cartaoSobrando: document.getElementById('cartao-sobrando'),
+  barraProgressoVerba: document.getElementById('barra-progresso-verba'),
+  textoPercentualGasto: document.getElementById('texto-percentual-gasto'),
   textoSituacaoSaldo: document.getElementById('texto-situacao-saldo'),
+  indicadorComprovadas: document.getElementById('indicador-comprovadas'),
+  indicadorPendentes: document.getElementById('indicador-pendentes'),
+  indicadorMaiorGasto: document.getElementById('indicador-maior-gasto'),
   contadorNotas: document.getElementById('contador-notas'),
   listaHistorico: document.getElementById('lista-historico'),
 
@@ -131,6 +137,9 @@ const el = {
   // Tela 2: Formulário de Lançamento
   formLancarNota: document.getElementById('form-lancar-nota'),
   tituloTelaLancar: document.getElementById('titulo-tela-lancar'),
+  blocoCategoriaPdde: document.getElementById('bloco-categoria-pdde'),
+  btnCatCusteio: document.getElementById('btn-cat-custeio'),
+  btnCatCapital: document.getElementById('btn-cat-capital'),
   btnTipoGasto: document.getElementById('btn-tipo-gasto'),
   btnTipoEntrada: document.getElementById('btn-tipo-entrada'),
   inputValorNota: document.getElementById('input-valor-nota'),
@@ -512,6 +521,20 @@ function renderizarCartoesDinheiro(lancamentosFiltrados) {
   el.valorGastos.textContent = formatarDinheiro(resumo.gastosCentavos);
   el.valorSobrando.textContent = formatarDinheiro(resumo.saldoCentavos);
 
+  // Termômetro Visual de Execução da Verba
+  const pct = resumo.percentualGasto || 0;
+  el.barraProgressoVerba.style.width = `${pct}%`;
+  el.textoPercentualGasto.textContent = `${pct}% executado`;
+
+  el.barraProgressoVerba.className = 'preenchimento-progresso ' + (
+    pct > 95 ? 'progresso-estouro' : (pct >= 75 ? 'progresso-alerta' : 'progresso-seguro')
+  );
+
+  // Atualizar Mini-painel de Auditoria e Saúde das Contas
+  el.indicadorComprovadas.textContent = String(resumo.totalComprovadas || 0);
+  el.indicadorPendentes.textContent = String(resumo.totalPendentes || 0);
+  el.indicadorMaiorGasto.textContent = formatarDinheiro(resumo.maiorGastoCentavos || 0);
+
   const negativo = resumo.saldoCentavos < 0;
   el.cartaoSobrando.classList.toggle('saldo-negativo', negativo);
 
@@ -574,6 +597,13 @@ function renderizarHistorico(lancamentosFiltrados) {
     );
 
     topoLinha.append(etiqueta, dataSpan);
+
+    if (nota.tipo === 'gasto' && nota.categoriaPdde) {
+      const seloPdde = document.createElement('span');
+      seloPdde.className = 'selo-custeio-capital ' + (nota.categoriaPdde === 'capital' ? 'selo-capital' : '');
+      seloPdde.textContent = nota.categoriaPdde === 'capital' ? 'Bem Permanente (Capital)' : 'Consumo (Custeio)';
+      topoLinha.appendChild(seloPdde);
+    }
 
     const desc = document.createElement('p');
     desc.className = 'nota-descricao';
@@ -707,6 +737,8 @@ function atualizarVisualTipoNota(tipo) {
   el.btnTipoGasto.className = 'btn-tipo' + (ehGasto ? ' ativo-gasto' : '');
   el.btnTipoEntrada.className = 'btn-tipo' + (!ehGasto ? ' ativo-entrada' : '');
 
+  el.blocoCategoriaPdde.hidden = !ehGasto;
+
   el.tituloTelaLancar.textContent = ehGasto
     ? 'Anotar um Gasto (Com Notinha)'
     : 'Colocar Dinheiro na Verba (Entrada)';
@@ -800,6 +832,12 @@ function renderizarPreviewNotinha() {
   }
 }
 
+function atualizarVisualCategoriaPdde(cat) {
+  estadoUI.formCategoriaPdde = cat === 'capital' ? 'capital' : 'custeio';
+  el.btnCatCusteio.classList.toggle('ativo', estadoUI.formCategoriaPdde === 'custeio');
+  el.btnCatCapital.classList.toggle('ativo', estadoUI.formCategoriaPdde === 'capital');
+}
+
 function prepararFormularioNota(tipoInicial = 'gasto') {
   estadoUI.notaEmEdicaoId = null;
   estadoUI.anexoOriginalId = null;
@@ -816,6 +854,7 @@ function prepararFormularioNota(tipoInicial = 'gasto') {
     estadoUI.formVerbaId = estadoUI.verbaSelecionadaId;
   }
 
+  atualizarVisualCategoriaPdde('custeio');
   atualizarVisualTipoNota(tipoInicial);
   renderizarVerbasFormulario();
   atualizarSugestoesFornecedores();
@@ -836,6 +875,7 @@ async function abrirNotaParaCorrecao(nota) {
   el.inputArquivoNotinha.value = '';
 
   atualizarVisualTipoNota(nota.tipo);
+  atualizarVisualCategoriaPdde(nota.categoriaPdde || 'custeio');
   el.tituloTelaLancar.textContent = 'Corrigir Nota Anotada';
   el.btnSalvarNota.lastElementChild.textContent = 'SALVAR CORREÇÃO';
   renderizarVerbasFormulario();
@@ -911,6 +951,7 @@ async function concluirSalvamentoDaNota() {
       const notaCorrigida = atualizarLancamento(estadoUI.dados, estadoUI.notaEmEdicaoId, {
         tipo: estadoUI.formTipo,
         verbaId: estadoUI.formVerbaId,
+        categoriaPdde: estadoUI.formTipo === 'gasto' ? estadoUI.formCategoriaPdde : 'custeio',
         valorCentavos,
         data: el.inputDataNota.value,
         descricao: el.inputDescricaoNota.value,
@@ -934,6 +975,7 @@ async function concluirSalvamentoDaNota() {
       const notaCriada = adicionarLancamento(estadoUI.dados, {
         tipo: estadoUI.formTipo,
         verbaId: estadoUI.formVerbaId,
+        categoriaPdde: estadoUI.formTipo === 'gasto' ? estadoUI.formCategoriaPdde : 'custeio',
         valorCentavos,
         data: el.inputDataNota.value,
         descricao: el.inputDescricaoNota.value,
@@ -1484,6 +1526,9 @@ function configurarEventos() {
   // Tela 2: eventos do formulário
   el.btnTipoGasto.addEventListener('click', () => atualizarVisualTipoNota('gasto'));
   el.btnTipoEntrada.addEventListener('click', () => atualizarVisualTipoNota('entrada'));
+
+  el.btnCatCusteio.addEventListener('click', () => atualizarVisualCategoriaPdde('custeio'));
+  el.btnCatCapital.addEventListener('click', () => atualizarVisualCategoriaPdde('capital'));
 
   el.inputValorNota.addEventListener('input', (e) => {
     e.target.value = formatarMascaraCentavos(e.target.value);

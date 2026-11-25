@@ -249,6 +249,7 @@ export function adicionarLancamento(estado, dadosNota) {
     id: `nota-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     tipo,
     verbaId: dadosNota.verbaId,
+    categoriaPdde: dadosNota.categoriaPdde || 'custeio',
     valorCentavos,
     data,
     descricao,
@@ -294,6 +295,7 @@ export function atualizarLancamento(estado, notaId, dadosAtualizados) {
 
   nota.tipo = tipo;
   nota.verbaId = dadosAtualizados.verbaId;
+  nota.categoriaPdde = dadosAtualizados.categoriaPdde || nota.categoriaPdde || 'custeio';
   nota.valorCentavos = valorCentavos;
   nota.data = data;
   nota.descricao = descricao;

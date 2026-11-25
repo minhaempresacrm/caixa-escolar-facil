@@ -229,8 +229,39 @@
                   </span>
                 </div>
                 <p id="valor-sobrando" class="cartao-valor valor-destaque">R$ 0,00</p>
-                <p id="texto-situacao-saldo" class="cartao-ajuda">Saldo livre disponível para usar</p>
+                <div class="trilho-progresso-verba" aria-hidden="true">
+                  <div id="barra-progresso-verba" class="preenchimento-progresso"></div>
+                </div>
+                <div class="rodape-termometro-verba">
+                  <span id="texto-percentual-gasto" class="texto-percentual">0% executado</span>
+                  <span id="texto-situacao-saldo" class="cartao-ajuda">Saldo livre disponível</span>
+                </div>
               </article>
+            </div>
+          </div>
+
+          <!-- PAINEL EXECUTIVO: INDICADORES DE AUDITORIA E SAÚDE DAS CONTAS -->
+          <div class="grade-indicadores-auditoria">
+            <div class="card-indicador">
+              <span class="indicador-titulo">COMPROVAÇÃO FISCAL</span>
+              <div class="indicador-conteudo">
+                <span id="indicador-comprovadas" class="indicador-numero positivo">0</span>
+                <span class="indicador-legenda">notas com cupom arquivado</span>
+              </div>
+            </div>
+            <div class="card-indicador">
+              <span class="indicador-titulo">PENDÊNCIAS DE FOTO</span>
+              <div class="indicador-conteudo">
+                <span id="indicador-pendentes" class="indicador-numero pendente">0</span>
+                <span class="indicador-legenda">compras aguardando notinha</span>
+              </div>
+            </div>
+            <div class="card-indicador">
+              <span class="indicador-titulo">MAIOR COMPRA REGISTRADA</span>
+              <div class="indicador-conteudo">
+                <span id="indicador-maior-gasto" class="indicador-numero neutro">R$ 0,00</span>
+                <span class="indicador-legenda">maior despesa desta verba</span>
+              </div>
             </div>
           </div>
 
@@ -360,6 +391,20 @@
                 />
               </div>
               <p class="ajuda-campo">Digite apenas os números. Exemplo: para R$ 150,50 digite 15050.</p>
+            </div>
+
+            <div class="bloco-passo" id="bloco-categoria-pdde">
+              <p class="rotulo-passo">Classificação Escolar (Regra PDDE / FNDE):</p>
+              <div class="seletor-custeio-capital" role="group" aria-label="Classificação PDDE">
+                <button type="button" id="btn-cat-custeio" class="btn-categoria-pdde ativo">
+                  <strong>Consumo / Manutenção (Custeio)</strong>
+                  <span>Papelaria, produtos de limpeza, alimentos, pequenos reparos</span>
+                </button>
+                <button type="button" id="btn-cat-capital" class="btn-categoria-pdde">
+                  <strong>Bem Permanente (Capital)</strong>
+                  <span>Computador, impressora, móveis, ventilador, eletrodomésticos</span>
+                </button>
+              </div>
             </div>
 
             <div class="bloco-passo">
