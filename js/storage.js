@@ -163,6 +163,63 @@ export function adicionarNovaVerba(estado, nome, icone) {
 }
 
 /**
+ * Edita o nome e o ícone de uma verba existente (inclusive as pré-definidas).
+ */
+export function editarVerba(estado, verbaId, { nome, icone }) {
+  const verba = estado.verbas.find((v) => v.id === verbaId);
+  if (!verba) {
+    throw new Error('Verba não encontrada.');
+  }
+
+  const nomeLimpo = limparTexto(nome, 40);
+  if (!nomeLimpo) {
+    throw new Error('Digite um nome válido para a verba.');
+  }
+
+  const jaExiste = estado.verbas.some(
+    (v) => v.id !== verbaId && !v.arquivada && v.nome.toLowerCase() === nomeLimpo.toLowerCase()
+  );
+  if (jaExiste) {
+    throw new Error('Já existe outra verba com esse nome.');
+  }
+
+  verba.nome = nomeLimpo;
+  if (icone) {
+    verba.icone = icone;
+  }
+
+  salvarEstadoEscola(estado);
+  return verba;
+}
+
+/**
+ * Remove uma verba se estiver vazia, ou arquiva se já possuir notas lançadas
+ * (protegendo o histórico financeiro da escola).
+ */
+export function removerOuArquivarVerba(estado, verbaId) {
+  const verbasAtivas = estado.verbas.filter((v) => !v.arquivada);
+  if (verbasAtivas.length <= 1) {
+    throw new Error('A escola precisa ter pelo menos 1 verba ativa.');
+  }
+
+  const indice = estado.verbas.findIndex((v) => v.id === verbaId);
+  if (indice === -1) {
+    throw new Error('Verba não encontrada.');
+  }
+
+  const temNotas = estado.lancamentos.some((n) => n.verbaId === verbaId);
+  if (temNotas) {
+    estado.verbas[indice].arquivada = true;
+    salvarEstadoEscola(estado);
+    return { acao: 'arquivada' };
+  }
+
+  estado.verbas.splice(indice, 1);
+  salvarEstadoEscola(estado);
+  return { acao: 'excluida' };
+}
+
+/**
  * Adiciona um novo fornecedor ou prestador de serviço.
  */
 export function adicionarFornecedor(estado, { nome, telefone, observacao }) {

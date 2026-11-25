@@ -20,6 +20,8 @@ import {
   carregarEstadoEscola,
   salvarEstadoEscola,
   adicionarNovaVerba,
+  editarVerba,
+  removerOuArquivarVerba,
   adicionarLancamento,
   atualizarLancamento,
   vincularNotinhaNaNota,
@@ -43,7 +45,7 @@ import {
   exportarBackupCompleto,
   lerEValidarArquivoBackup,
 } from './cloud.js';
-import { criarIcone } from './icons.js';
+import { criarIcone, resolverChaveIcone } from './icons.js';
 import { renderizarGraficoPizza, renderizarGraficoBarrasVerbas } from './charts.js';
 
 const ATALHOS_GASTO = [
@@ -68,6 +70,7 @@ const estadoUI = {
   verbaSelecionadaId: 'todas',
   telaAtual: 'resumo',
   iconeNovaVerba: 'escola',
+  verbaEmEdicaoId: null,
   acaoConfirmacaoPendente: null,
 
   // Filtros da Tela Inicial
@@ -180,9 +183,12 @@ const el = {
 
   // Modais
   modalNovaVerba: document.getElementById('modal-nova-verba'),
+  tituloModalVerba: document.getElementById('titulo-modal-verba'),
   formNovaVerba: document.getElementById('form-nova-verba'),
   inputNomeVerba: document.getElementById('input-nome-verba'),
   btnCancelarVerba: document.getElementById('btn-cancelar-verba'),
+  btnSalvarVerba: document.getElementById('btn-salvar-verba'),
+  btnExcluirVerba: document.getElementById('btn-excluir-verba'),
 
   modalConfirmacao: document.getElementById('modal-confirmacao'),
   tituloConfirmacao: document.getElementById('titulo-confirmacao'),
@@ -433,6 +439,22 @@ function renderizarAbasVerbas() {
       ehNova: true,
     })
   );
+
+  // Se uma verba específica estiver selecionada, mostra botão claro para editá-la
+  if (estadoUI.verbaSelecionadaId !== 'todas') {
+    const verbaAtual = verbasAtivas.find((v) => v.id === estadoUI.verbaSelecionadaId);
+    if (verbaAtual) {
+      const btnEditar = document.createElement('button');
+      btnEditar.type = 'button';
+      btnEditar.className = 'aba-verba aba-editar';
+      btnEditar.append(
+        criarIcone('editar', 18),
+        document.createTextNode(`Editar "${verbaAtual.nome}"`)
+      );
+      btnEditar.addEventListener('click', () => abrirModalEditarVerba(verbaAtual));
+      el.listaAbasVerbas.appendChild(btnEditar);
+    }
+  }
 }
 
 function atualizarOpcoesFiltroFornecedor() {
@@ -1338,13 +1360,41 @@ async function abrirNotinhaSalva(anexoId) {
 /* ==========================================================================
    MODAIS AUXILIARES (NOVA VERBA, CONFIRMAÇÃO, ESCOLA E SENHA, FORNECEDOR)
    ========================================================================== */
+function selecionarIconeNoModalVerba(chaveIcone) {
+  const chave = resolverChaveIcone(chaveIcone);
+  estadoUI.iconeNovaVerba = chave;
+  document.querySelectorAll('#grade-icones-verba .opcao-icone').forEach((b) => {
+    b.classList.toggle('ativo', b.dataset.icone === chave);
+  });
+}
+
 function abrirModalNovaVerba() {
+  estadoUI.verbaEmEdicaoId = null;
+  el.tituloModalVerba.textContent = 'Criar Nova Verba';
+  el.btnSalvarVerba.textContent = 'Salvar Nova Verba';
+  el.btnExcluirVerba.hidden = true;
   el.inputNomeVerba.value = '';
+  selecionarIconeNoModalVerba('escola');
   el.modalNovaVerba.hidden = false;
   setTimeout(() => el.inputNomeVerba.focus(), 50);
 }
 
+function abrirModalEditarVerba(verba) {
+  estadoUI.verbaEmEdicaoId = verba.id;
+  el.tituloModalVerba.textContent = 'Editar Verba';
+  el.btnSalvarVerba.textContent = 'Salvar Alterações';
+  el.btnExcluirVerba.hidden = false;
+  el.inputNomeVerba.value = verba.nome;
+  selecionarIconeNoModalVerba(verba.icone || 'verba');
+  el.modalNovaVerba.hidden = false;
+  setTimeout(() => {
+    el.inputNomeVerba.focus();
+    el.inputNomeVerba.select();
+  }, 50);
+}
+
 function fecharModalNovaVerba() {
+  estadoUI.verbaEmEdicaoId = null;
   el.modalNovaVerba.hidden = true;
 }
 
@@ -1746,18 +1796,55 @@ function configurarEventos() {
 
   el.btnCancelarVerba.addEventListener('click', fecharModalNovaVerba);
 
+  el.btnExcluirVerba.addEventListener('click', () => {
+    const idVerba = estadoUI.verbaEmEdicaoId;
+    const verba = estadoUI.dados.verbas.find((v) => v.id === idVerba);
+    if (!verba) return;
+
+    const temNotas = estadoUI.dados.lancamentos.some((n) => n.verbaId === idVerba);
+    const msg = temNotas
+      ? `A verba "${verba.nome}" já possui notas lançadas. Ela será removida das abas, mas o histórico das notas continuará salvo em "Todas as Verbas". Deseja continuar?`
+      : `Tem certeza que deseja excluir a verba "${verba.nome}"?`;
+
+    abrirConfirmacao('Remover esta verba?', msg, () => {
+      try {
+        const res = removerOuArquivarVerba(estadoUI.dados, idVerba);
+        estadoUI.verbaSelecionadaId = 'todas';
+        fecharModalNovaVerba();
+        renderizarTudo();
+        mostrarAviso(
+          res.acao === 'arquivada'
+            ? `Verba "${verba.nome}" removida das abas (notas preservadas no histórico).`
+            : `Verba "${verba.nome}" excluída com sucesso.`
+        );
+      } catch (erro) {
+        mostrarAviso(erro.message, 'erro');
+      }
+    });
+  });
+
   el.formNovaVerba.addEventListener('submit', (e) => {
     e.preventDefault();
     try {
-      const nova = adicionarNovaVerba(
-        estadoUI.dados,
-        el.inputNomeVerba.value,
-        estadoUI.iconeNovaVerba
-      );
-      estadoUI.verbaSelecionadaId = nova.id;
-      fecharModalNovaVerba();
-      renderizarTudo();
-      mostrarAviso(`Verba "${nova.nome}" criada com sucesso!`);
+      if (estadoUI.verbaEmEdicaoId) {
+        const atualizada = editarVerba(estadoUI.dados, estadoUI.verbaEmEdicaoId, {
+          nome: el.inputNomeVerba.value,
+          icone: estadoUI.iconeNovaVerba,
+        });
+        fecharModalNovaVerba();
+        renderizarTudo();
+        mostrarAviso(`Verba atualizada para "${atualizada.nome}"!`);
+      } else {
+        const nova = adicionarNovaVerba(
+          estadoUI.dados,
+          el.inputNomeVerba.value,
+          estadoUI.iconeNovaVerba
+        );
+        estadoUI.verbaSelecionadaId = nova.id;
+        fecharModalNovaVerba();
+        renderizarTudo();
+        mostrarAviso(`Verba "${nova.nome}" criada com sucesso!`);
+      }
     } catch (erro) {
       mostrarAviso(erro.message, 'erro');
     }

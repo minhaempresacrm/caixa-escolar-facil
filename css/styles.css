@@ -585,6 +585,18 @@ select:focus-visible {
   background-color: #FFFFFF;
 }
 
+.aba-verba.aba-editar {
+  border-color: var(--cor-borda-forte);
+  color: var(--cor-texto-suave);
+  background-color: #FFFFFF;
+}
+
+.aba-verba.aba-editar:hover {
+  border-color: var(--cor-azul);
+  color: var(--cor-azul);
+  background-color: var(--cor-azul-claro);
+}
+
 /* ==========================================================================
    TERMÔMETRO VISUAL DE VERBA E INDICADORES DE AUDITORIA
    ========================================================================== */
@@ -1931,6 +1943,18 @@ select:focus-visible {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 20px;
+}
+
+.modal-botoes-espacados {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-botoes-grupo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: auto;
 }
 
 .modal-botoes-coluna {
