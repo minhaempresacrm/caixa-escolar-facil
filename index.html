@@ -161,108 +161,89 @@
             </button>
           </div>
 
-          <!-- ABAS SEPARADAS POR VERBA -->
-          <div class="secao-bloco">
-            <div class="cabecalho-bloco">
-              <h2 class="titulo-secao">Verbas da Escola</h2>
-              <p class="subtitulo-secao">Selecione uma aba para ver o dinheiro e as notas somente daquela verba.</p>
+          <!-- CABEÇALHO EXECUTIVO DA TELA INICIAL -->
+          <div class="cabecalho-executivo">
+            <div>
+              <h2 id="titulo-verba-atual" class="titulo-executivo">Resumo Financeiro da Escola</h2>
+              <p class="subtitulo-executivo">Acompanhe o saldo das verbas, gastos registrados e comprovantes fiscais.</p>
             </div>
+            <div class="acoes-principais-duplas">
+              <button type="button" id="btn-atalho-entrada" class="btn-acao-destaque btn-entrada">
+                <svg class="icone-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span>Colocar Dinheiro</span>
+              </button>
+              <button type="button" id="btn-atalho-gasto" class="btn-acao-destaque btn-azul-primario">
+                <svg class="icone-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+                </svg>
+                <span>Anotar Gasto</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- ABAS SEPARADAS POR VERBA (FAIXA LIMPA) -->
+          <div class="secao-bloco">
             <div id="lista-abas-verbas" class="abas-verbas" role="tablist" aria-label="Abas de Verbas da Escola">
               <!-- Preenchido dinamicamente por js/app.js -->
             </div>
           </div>
 
-          <!-- 3 CARTÕES EXECUTIVOS DE DINHEIRO -->
+          <!-- 4 CARTÕES EXECUTIVOS DE RESUMO -->
           <div class="secao-bloco">
-            <div class="cabecalho-resumo-acoes">
-              <h2 id="titulo-verba-atual" class="titulo-secao">Resumo: Todas as Verbas da Escola</h2>
-              <div class="acoes-principais-duplas">
-                <button type="button" id="btn-atalho-gasto" class="btn-acao-destaque btn-gasto">
-                  <svg class="icone-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
-                  </svg>
-                  <span>Anotar Gasto (Com Notinha)</span>
-                </button>
-                <button type="button" id="btn-atalho-entrada" class="btn-acao-destaque btn-entrada">
-                  <svg class="icone-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
-                  </svg>
-                  <span>Colocar Dinheiro na Verba</span>
-                </button>
-              </div>
-            </div>
-
             <div class="grade-cartoes-dinheiro">
-              <article class="cartao-dinheiro cartao-entrada">
-                <div class="cartao-topo">
-                  <span class="cartao-rotulo">DINHEIRO EM CAIXA (ENTROU)</span>
-                  <span class="circulo-icone icone-verde" aria-hidden="true">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                      <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
-                    </svg>
-                  </span>
-                </div>
-                <p id="valor-total-entradas" class="cartao-valor">R$ 0,00</p>
-                <p class="cartao-ajuda">Total recebido nesta verba</p>
-              </article>
-
-              <article class="cartao-dinheiro cartao-gasto">
-                <div class="cartao-topo">
-                  <span class="cartao-rotulo">TOTAL GASTO (NOTAS)</span>
-                  <span class="circulo-icone icone-vermelho" aria-hidden="true">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                      <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
-                    </svg>
-                  </span>
-                </div>
-                <p id="valor-total-gastos" class="cartao-valor">R$ 0,00</p>
-                <p class="cartao-ajuda">Soma de todas as compras anotadas</p>
-              </article>
-
               <article id="cartao-sobrando" class="cartao-dinheiro cartao-sobrando">
-                <div class="cartao-topo">
-                  <span class="cartao-rotulo">DINHEIRO SOBRANDO AGORA</span>
-                  <span class="circulo-icone icone-azul" aria-hidden="true">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
-                    </svg>
-                  </span>
-                </div>
-                <p id="valor-sobrando" class="cartao-valor valor-destaque">R$ 0,00</p>
+                <span class="cartao-rotulo">DINHEIRO SOBRANDO AGORA</span>
+                <p id="valor-sobrando" class="cartao-valor valor-azul">R$ 0,00</p>
                 <div class="trilho-progresso-verba" aria-hidden="true">
                   <div id="barra-progresso-verba" class="preenchimento-progresso"></div>
                 </div>
                 <div class="rodape-termometro-verba">
-                  <span id="texto-percentual-gasto" class="texto-percentual">0% executado</span>
-                  <span id="texto-situacao-saldo" class="cartao-ajuda">Saldo livre disponível</span>
+                  <span id="texto-percentual-gasto" class="texto-percentual">0% usado</span>
+                  <span id="texto-situacao-saldo" class="cartao-ajuda">Saldo livre</span>
                 </div>
+              </article>
+
+              <article class="cartao-dinheiro cartao-entrada">
+                <span class="cartao-rotulo">DINHEIRO EM CAIXA</span>
+                <p id="valor-total-entradas" class="cartao-valor valor-escuro">R$ 0,00</p>
+                <p class="cartao-ajuda">Total recebido nesta verba</p>
+              </article>
+
+              <article class="cartao-dinheiro cartao-gasto">
+                <span class="cartao-rotulo">TOTAL GASTO EM NOTAS</span>
+                <p id="valor-total-gastos" class="cartao-valor valor-verde">R$ 0,00</p>
+                <p class="cartao-ajuda">
+                  <span id="indicador-comprovadas">0</span> com foto • Maior: <strong id="indicador-maior-gasto">R$ 0,00</strong>
+                </p>
+              </article>
+
+              <article id="cartao-pendencias" class="cartao-dinheiro cartao-pendencia">
+                <span class="cartao-rotulo">FALTAM NOTINHAS</span>
+                <p id="indicador-pendentes" class="cartao-valor valor-alerta">0</p>
+                <p id="texto-pendencias-ajuda" class="cartao-ajuda">Compras aguardando foto</p>
               </article>
             </div>
           </div>
 
-          <!-- PAINEL EXECUTIVO: INDICADORES DE AUDITORIA E SAÚDE DAS CONTAS -->
-          <div class="grade-indicadores-auditoria">
-            <div class="card-indicador">
-              <span class="indicador-titulo">COMPROVAÇÃO FISCAL</span>
-              <div class="indicador-conteudo">
-                <span id="indicador-comprovadas" class="indicador-numero positivo">0</span>
-                <span class="indicador-legenda">notas com cupom arquivado</span>
+          <!-- PAINEL DE GRÁFICOS (2 COLUNAS EXECUTIVAS: BARRAS + GRÁFICO PIZZA) -->
+          <div class="secao-bloco grade-graficos-executivo">
+            <article class="cartao-grafico">
+              <div class="grafico-cabecalho">
+                <h3 class="grafico-titulo">Acompanhamento por Verba</h3>
+                <p class="grafico-subtitulo">Quanto já foi gasto e quanto ainda sobra em cada verba da escola.</p>
               </div>
-            </div>
-            <div class="card-indicador">
-              <span class="indicador-titulo">PENDÊNCIAS DE FOTO</span>
-              <div class="indicador-conteudo">
-                <span id="indicador-pendentes" class="indicador-numero pendente">0</span>
-                <span class="indicador-legenda">compras aguardando notinha</span>
+              <div id="grafico-barras-verbas" class="grafico-corpo"></div>
+            </article>
+
+            <article class="cartao-grafico">
+              <div class="grafico-cabecalho">
+                <h3 id="titulo-grafico-pizza" class="grafico-titulo">Onde o Dinheiro Foi Gasto</h3>
+                <p id="subtitulo-grafico-pizza" class="grafico-subtitulo">Divisão visual dos gastos registrados.</p>
               </div>
-            </div>
-            <div class="card-indicador">
-              <span class="indicador-titulo">MAIOR COMPRA REGISTRADA</span>
-              <div class="indicador-conteudo">
-                <span id="indicador-maior-gasto" class="indicador-numero neutro">R$ 0,00</span>
-                <span class="indicador-legenda">maior despesa desta verba</span>
-              </div>
-            </div>
+              <div id="grafico-pizza-gastos" class="grafico-corpo"></div>
+            </article>
           </div>
 
           <!-- HISTÓRICO FÁCIL DE LER EM CARTÕES -->

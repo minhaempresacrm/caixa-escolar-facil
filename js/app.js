@@ -44,6 +44,7 @@ import {
   lerEValidarArquivoBackup,
 } from './cloud.js';
 import { criarIcone } from './icons.js';
+import { renderizarGraficoPizza, renderizarGraficoBarrasVerbas } from './charts.js';
 
 const ATALHOS_GASTO = [
   'Papelaria / Expediente',
@@ -119,6 +120,12 @@ const el = {
   indicadorComprovadas: document.getElementById('indicador-comprovadas'),
   indicadorPendentes: document.getElementById('indicador-pendentes'),
   indicadorMaiorGasto: document.getElementById('indicador-maior-gasto'),
+  cartaoPendencias: document.getElementById('cartao-pendencias'),
+  textoPendenciasAjuda: document.getElementById('texto-pendencias-ajuda'),
+  graficoBarrasVerbas: document.getElementById('grafico-barras-verbas'),
+  graficoPizzaGastos: document.getElementById('grafico-pizza-gastos'),
+  tituloGraficoPizza: document.getElementById('titulo-grafico-pizza'),
+  subtituloGraficoPizza: document.getElementById('subtitulo-grafico-pizza'),
   contadorNotas: document.getElementById('contador-notas'),
   listaHistorico: document.getElementById('lista-historico'),
 
@@ -530,21 +537,83 @@ function renderizarCartoesDinheiro(lancamentosFiltrados) {
     pct > 95 ? 'progresso-estouro' : (pct >= 75 ? 'progresso-alerta' : 'progresso-seguro')
   );
 
-  // Atualizar Mini-painel de Auditoria e Saúde das Contas
+  // Atualizar indicadores de comprovação e pendências
   el.indicadorComprovadas.textContent = String(resumo.totalComprovadas || 0);
   el.indicadorPendentes.textContent = String(resumo.totalPendentes || 0);
   el.indicadorMaiorGasto.textContent = formatarDinheiro(resumo.maiorGastoCentavos || 0);
+
+  const semPendencias = (resumo.totalPendentes || 0) === 0;
+  el.cartaoPendencias.classList.toggle('sem-pendencia', semPendencias);
+  el.textoPendenciasAjuda.textContent = semPendencias
+    ? 'Todas as compras têm notinha'
+    : 'Compras aguardando foto da notinha';
 
   const negativo = resumo.saldoCentavos < 0;
   el.cartaoSobrando.classList.toggle('saldo-negativo', negativo);
 
   if (negativo) {
-    el.textoSituacaoSaldo.textContent = 'Atenção: os gastos passaram do dinheiro disponível nesta verba.';
+    el.textoSituacaoSaldo.textContent = 'Saldo negativo nesta verba';
   } else if (resumo.saldoCentavos === 0) {
-    el.textoSituacaoSaldo.textContent = 'Saldo zerado nesta verba no momento.';
+    el.textoSituacaoSaldo.textContent = 'Saldo zerado';
   } else {
-    el.textoSituacaoSaldo.textContent = 'Saldo livre disponível para usar com segurança.';
+    el.textoSituacaoSaldo.textContent = 'Saldo livre';
   }
+}
+
+function renderizarGraficosExecutivos() {
+  const verbasAtivas = estadoUI.dados.verbas.filter((v) => !v.arquivada);
+  const mapaVerbas = new Map(verbasAtivas.map((v) => [v.id, v]));
+
+  // 1. Gráfico de Barras por Verba
+  const resumoPorVerba = verbasAtivas.map((verba) => {
+    const notas = estadoUI.dados.lancamentos.filter((n) => n.verbaId === verba.id);
+    const r = calcularResumoFinanceiro(notas);
+    return {
+      nome: verba.nome,
+      entradasCentavos: r.entradasCentavos,
+      gastosCentavos: r.gastosCentavos,
+      saldoCentavos: r.saldoCentavos,
+    };
+  });
+  renderizarGraficoBarrasVerbas(el.graficoBarrasVerbas, resumoPorVerba);
+
+  // 2. Gráfico Pizza (por Verba quando em "Todas", ou por Compra/Fornecedor quando numa verba específica)
+  const gastosFiltrados = estadoUI.dados.lancamentos.filter((n) => {
+    if (n.tipo !== 'gasto') return false;
+    if (estadoUI.verbaSelecionadaId !== 'todas' && n.verbaId !== estadoUI.verbaSelecionadaId) {
+      return false;
+    }
+    return true;
+  });
+
+  const acumulado = new Map();
+
+  if (estadoUI.verbaSelecionadaId === 'todas') {
+    el.tituloGraficoPizza.textContent = 'Onde o Dinheiro Foi Gasto';
+    el.subtituloGraficoPizza.textContent = 'Divisão dos gastos entre as verbas da escola.';
+
+    for (const g of gastosFiltrados) {
+      const v = mapaVerbas.get(g.verbaId);
+      const chave = v ? v.nome : 'Outras Verbas';
+      acumulado.set(chave, (acumulado.get(chave) || 0) + g.valorCentavos);
+    }
+  } else {
+    const verbaAtual = mapaVerbas.get(estadoUI.verbaSelecionadaId);
+    el.tituloGraficoPizza.textContent = `Gastos: ${verbaAtual ? verbaAtual.nome : 'Verba'}`;
+    el.subtituloGraficoPizza.textContent = 'Divisão por fornecedor ou motivo nesta verba.';
+
+    for (const g of gastosFiltrados) {
+      const chave = g.fornecedorNome || g.descricao || 'Outros Gastos';
+      acumulado.set(chave, (acumulado.get(chave) || 0) + g.valorCentavos);
+    }
+  }
+
+  const fatias = Array.from(acumulado.entries()).map(([rotulo, valorCentavos]) => ({
+    rotulo,
+    valorCentavos,
+  }));
+
+  renderizarGraficoPizza(el.graficoPizzaGastos, fatias);
 }
 
 function renderizarHistorico(lancamentosFiltrados) {
@@ -713,6 +782,7 @@ function renderizarTudo() {
   renderizarAbasVerbas();
   const lancamentosFiltrados = obterLancamentosFiltrados();
   renderizarCartoesDinheiro(lancamentosFiltrados);
+  renderizarGraficosExecutivos();
   renderizarHistorico(lancamentosFiltrados);
 }
 

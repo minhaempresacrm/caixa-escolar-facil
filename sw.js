@@ -3,13 +3,14 @@
  * e abrir mesmo quando a internet da escola estiver fraca ou fora do ar.
  */
 
-const CACHE_NOME = 'caixa-escolar-facil-v2';
+const CACHE_NOME = 'caixa-escolar-facil-v3';
 const ARQUIVOS_BASE = [
   './',
   './index.html',
   './manifest.json',
   './css/styles.css',
   './js/app.js',
+  './js/charts.js',
   './js/icons.js',
   './js/money.js',
   './js/security.js',
