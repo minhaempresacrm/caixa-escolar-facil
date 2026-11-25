@@ -831,11 +831,11 @@ select:focus-visible {
 }
 
 .btn-azul-primario {
-  background-color: #2563EB;
+  background-color: var(--cor-azul);
 }
 
 .btn-azul-primario:hover {
-  background-color: #1D4ED8;
+  background-color: var(--cor-azul-hover);
 }
 
 .grade-cartoes-dinheiro {
@@ -884,7 +884,7 @@ select:focus-visible {
 }
 
 .valor-azul {
-  color: #2563EB;
+  color: var(--cor-azul);
 }
 
 .valor-escuro {

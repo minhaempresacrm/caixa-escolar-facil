@@ -148,7 +148,19 @@ export async function carregarEstadoEscola() {
   return estadoInicial;
 }
 
+let _suspenderPersistencia = false;
+
+export function executarEmRascunho(fn) {
+  _suspenderPersistencia = true;
+  try {
+    return fn();
+  } finally {
+    _suspenderPersistencia = false;
+  }
+}
+
 export function salvarEstadoEscola(estado, { ignorarNuvem = false } = {}) {
+  if (_suspenderPersistencia) return;
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(chaveDadosEscopada(), JSON.stringify(estado));
   }

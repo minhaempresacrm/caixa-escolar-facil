@@ -93,11 +93,29 @@ export async function exportarBackupCompleto(estadoDados) {
   return { totalNotas: estadoDados.lancamentos.length, totalFotos: anexos.length };
 }
 
+const REGEX_DATA_URL_SEGURA = /^data:(image\/(jpeg|png|webp)|application\/pdf);base64,[A-Za-z0-9+/=\s]+$/i;
+
+export function dataUrlAnexoSegura(dataUrl) {
+  return typeof dataUrl === 'string' && REGEX_DATA_URL_SEGURA.test(dataUrl.trim());
+}
+
+export async function persistirAnexosBackup(anexosValidos) {
+  let total = 0;
+  if (!Array.isArray(anexosValidos)) return total;
+  for (const anexo of anexosValidos) {
+    if (anexo && typeof anexo.id === 'string' && dataUrlAnexoSegura(anexo.dataUrl)) {
+      await salvarAnexo(anexo.id, anexo);
+      total += 1;
+    }
+  }
+  return total;
+}
+
 /**
- * Lê um arquivo de backup escolhido pelo diretor, valida e restaura os anexos no IndexedDB.
- * Retorna o objeto `dados` validado para ser salvo no storage principal.
+ * Lê um arquivo de backup escolhido pelo diretor, valida e opcionalmente restaura os anexos no IndexedDB.
+ * Retorna o objeto `dados` validado e os anexos sanitizados.
  */
-export async function lerEValidarArquivoBackup(arquivo) {
+export async function lerEValidarArquivoBackup(arquivo, { salvarAnexosAgora = true } = {}) {
   if (!arquivo) {
     throw new Error('Nenhum arquivo de cópia de segurança foi selecionado.');
   }
@@ -119,16 +137,23 @@ export async function lerEValidarArquivoBackup(arquivo) {
     throw new Error(validacao.erro);
   }
 
+  const anexosValidos = [];
   if (Array.isArray(pacote.anexos)) {
     for (const anexo of pacote.anexos) {
-      if (anexo && typeof anexo.id === 'string' && typeof anexo.dataUrl === 'string') {
-        await salvarAnexo(anexo.id, anexo);
+      if (anexo && typeof anexo.id === 'string' && dataUrlAnexoSegura(anexo.dataUrl)) {
+        anexosValidos.push(anexo);
       }
     }
   }
 
+  let totalRestauradas = anexosValidos.length;
+  if (salvarAnexosAgora && anexosValidos.length > 0) {
+    totalRestauradas = await persistirAnexosBackup(anexosValidos);
+  }
+
   return {
     dados: pacote.dados,
-    totalFotosRestauradas: Array.isArray(pacote.anexos) ? pacote.anexos.length : 0,
+    anexosValidos,
+    totalFotosRestauradas: totalRestauradas,
   };
 }

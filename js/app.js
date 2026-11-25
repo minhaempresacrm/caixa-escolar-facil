@@ -19,7 +19,7 @@ import { gerarHashPin, controleTentativas } from './security.js';
 import {
   carregarEstadoEscola,
   salvarEstadoEscola,
-  registrarSincronizadorNuvem,
+  executarEmRascunho,
   adicionarNovaVerba,
   editarVerba,
   removerOuArquivarVerba,
@@ -45,6 +45,8 @@ import {
 import {
   exportarBackupCompleto,
   lerEValidarArquivoBackup,
+  persistirAnexosBackup,
+  dataUrlAnexoSegura,
 } from './cloud.js';
 import { criarIcone, resolverChaveIcone } from './icons.js';
 import { renderizarGraficoPizza, renderizarGraficoBarrasVerbas } from './charts.js';
@@ -57,9 +59,11 @@ import {
   buscarEstadoNuvem,
   salvarEstadoNuvem,
   sairSessaoNuvem,
+  limparTokenNuvem,
   obterTokenNuvemAtivo,
   estaEmImpersonacao,
   obterEscolaPublicaAtual,
+  marcarPinPersonalizadoNaEscola,
   aplicarIdentidadeVisualEscola,
   moduloCefAtivo,
 } from './rpmaster_bridge.js';
@@ -343,6 +347,8 @@ function normalizarEstadoNuvem(estadoRemoto, escolaInfo) {
   };
 }
 
+let _avisoDispensadoTexto = '';
+
 function aplicarTravasModulosCef() {
   const pub = obterEscolaPublicaAtual();
   document.querySelectorAll('[data-cef-mod]').forEach((node) => {
@@ -350,11 +356,18 @@ function aplicarTravasModulosCef() {
     node.hidden = !moduloCefAtivo(mod);
   });
 
+  if (
+    (estadoUI.telaAtual === 'lancar' && !moduloCefAtivo('lancar')) ||
+    (estadoUI.telaAtual === 'cadastros' && !moduloCefAtivo('fornecedores'))
+  ) {
+    irParaTela('resumo');
+  }
+
   const bannerAviso = document.getElementById('banner-aviso-rpmaster');
   const txtAviso = document.getElementById('texto-aviso-rpmaster');
   if (bannerAviso && txtAviso) {
     const aviso = pub && pub.aviso_rpmaster ? String(pub.aviso_rpmaster).trim() : '';
-    if (aviso) {
+    if (aviso && aviso !== _avisoDispensadoTexto) {
       txtAviso.textContent = aviso;
       bannerAviso.hidden = false;
     } else {
@@ -376,22 +389,33 @@ function aplicarTravasModulosCef() {
 let _syncEmAndamento = false;
 let _ultimoPullFocus = 0;
 
-async function sincronizarComNuvem(estadoAtual, meta = null) {
-  if (!modoNuvemAtivo() || !obterTokenNuvemAtivo()) return { ok: true };
+async function sincronizarComNuvem(estadoCandidato, meta = null, { preservarFormularioNoConflito = false } = {}) {
+  if (!modoNuvemAtivo()) return { ok: true };
+  if (!obterTokenNuvemAtivo()) {
+    await sairParaTelaAcesso({ silencioso: true });
+    mostrarErroPin('Sessão expirada. Digite sua senha novamente.');
+    return { ok: false, error: 'Sessão expirada.' };
+  }
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     mostrarAviso('Sem internet: reconecte para salvar os dados da escola na nuvem com segurança.', 'erro');
     return { ok: false, offline: true };
   }
   _syncEmAndamento = true;
   try {
-    const res = await salvarEstadoNuvem(estadoAtual, meta);
+    const res = await salvarEstadoNuvem(estadoCandidato, meta);
     if (!res || !res.ok) {
       if (res && res.conflict) {
-        mostrarAviso('Outro aparelho atualizou os dados. Recarregando versão mais recente...', 'erro');
-        await recarregarDaNuvem();
+        await recarregarDaNuvem({ preservarFormulario: preservarFormularioNoConflito });
+        mostrarAviso(
+          preservarFormularioNoConflito
+            ? 'Outro aparelho atualizou o caixa. Atualizamos os dados em segundo plano — revise e toque em Salvar novamente.'
+            : 'Outro aparelho atualizou os dados. Recarregamos a versão mais recente; repita a ação se necessário.',
+          'erro'
+        );
       } else if (res && res.suspended) {
-        mostrarAviso(res.error || 'Sistema suspenso pelo RPMASTER.', 'erro');
-        await sairParaTelaAcesso();
+        limparTokenNuvem();
+        await sairParaTelaAcesso({ silencioso: true });
+        exibirBloqueioTelaAcesso(res.error || 'Sistema suspenso pelo RPMASTER.');
       } else {
         mostrarAviso((res && res.error) || 'Não foi possível salvar na nuvem.', 'erro');
       }
@@ -406,14 +430,41 @@ async function sincronizarComNuvem(estadoAtual, meta = null) {
   }
 }
 
-async function recarregarDaNuvem() {
+async function comitarMutacao(fnMutacao, { meta = null, preservarFormularioNoConflito = false } = {}) {
+  if (!modoNuvemAtivo()) {
+    const retorno = fnMutacao(estadoUI.dados);
+    return { ok: true, retorno };
+  }
+  if (_syncEmAndamento) {
+    mostrarAviso('Aguarde o salvamento anterior terminar...', 'erro');
+    return { ok: false, busy: true };
+  }
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    mostrarAviso('Sem internet: reconecte para salvar os dados da escola na nuvem com segurança.', 'erro');
+    return { ok: false, offline: true };
+  }
+  const candidato = structuredClone(estadoUI.dados);
+  const retorno = executarEmRascunho(() => fnMutacao(candidato));
+  const res = await sincronizarComNuvem(candidato, meta, { preservarFormularioNoConflito });
+  if (!res || !res.ok) {
+    return { ok: false, res };
+  }
+  estadoUI.dados = candidato;
+  salvarEstadoEscola(estadoUI.dados, { ignorarNuvem: true });
+  return { ok: true, retorno, res };
+}
+
+async function recarregarDaNuvem({ preservarFormulario = false } = {}) {
   if (!modoNuvemAtivo() || !obterTokenNuvemAtivo()) return false;
   try {
     const res = await buscarEstadoNuvem();
     if (!res || !res.ok) {
+      limparTokenNuvem();
+      await sairParaTelaAcesso({ silencioso: true });
       if (res && res.suspended) {
-        await sairParaTelaAcesso();
         exibirBloqueioTelaAcesso(res.error || 'Sistema suspenso pelo RPMASTER.');
+      } else {
+        mostrarErroPin((res && res.error) || 'Sessão encerrada ou expirada. Digite sua senha novamente.');
       }
       return false;
     }
@@ -423,7 +474,12 @@ async function recarregarDaNuvem() {
     el.subtituloEscola.textContent = estadoUI.dados.escola.nome;
     el.topoNomeEscola.textContent = estadoUI.dados.escola.nome;
     aplicarTravasModulosCef();
-    renderizarTudo();
+    if (!preservarFormulario) {
+      renderizarTudo();
+      if (estadoUI.telaAtual === 'cadastros') {
+        renderizarListaFornecedores();
+      }
+    }
     return true;
   } catch {
     return false;
@@ -509,7 +565,8 @@ function abrirAplicacaoPrincipal() {
   renderizarTudo();
 }
 
-async function sairParaTelaAcesso() {
+async function sairParaTelaAcesso({ silencioso = false } = {}) {
+  const eraImpersonacao = estaEmImpersonacao();
   if (modoNuvemAtivo()) {
     await sairSessaoNuvem();
   }
@@ -523,13 +580,37 @@ async function sairParaTelaAcesso() {
   atualizarDicaPinAcesso();
   el.appPrincipal.hidden = true;
   el.telaAcesso.hidden = false;
-  mostrarAviso('Você saiu com segurança.');
+
+  if (eraImpersonacao && modoNuvemAtivo() && !silencioso) {
+    try {
+      const info = await obterInfoPublicaEscola(obterSlugEscolaUrl());
+      if (info && info.ok && info.escola && (!info.escola.ativo || info.escola.status_assinatura === 'suspenso')) {
+        const motivo = info.escola.bloqueio_motivo ? ` Motivo: ${info.escola.bloqueio_motivo}` : ' Entre em contato com o suporte RPMASTER.';
+        exibirBloqueioTelaAcesso(`O sistema de ${info.escola.nome_escola} encontra-se temporariamente suspenso.${motivo}`);
+        return;
+      }
+    } catch {
+      // Ignora
+    }
+  }
+  if (!silencioso) {
+    mostrarAviso('Você saiu com segurança.');
+  }
 }
 
 /* ==========================================================================
    NAVEGAÇÃO ENTRE AS 3 TELAS PRINCIPAIS
    ========================================================================== */
 function irParaTela(nomeTela) {
+  if (nomeTela === 'lancar' && !moduloCefAtivo('lancar')) {
+    mostrarAviso('O módulo Anotar Notas está desativado no plano desta escola.', 'erro');
+    nomeTela = 'resumo';
+  }
+  if (nomeTela === 'cadastros' && !moduloCefAtivo('fornecedores')) {
+    mostrarAviso('O módulo Fornecedores está desativado no plano desta escola.', 'erro');
+    nomeTela = 'resumo';
+  }
+
   estadoUI.telaAtual = nomeTela;
 
   const telas = {
@@ -910,6 +991,8 @@ function renderizarHistorico(lancamentosFiltrados) {
     const acoesLinha = document.createElement('div');
     acoesLinha.className = 'nota-acoes-linha';
 
+    const podeLancar = moduloCefAtivo('lancar');
+
     if (nota.temNotinha && nota.anexoId) {
       const btnVer = document.createElement('button');
       btnVer.type = 'button';
@@ -917,7 +1000,7 @@ function renderizarHistorico(lancamentosFiltrados) {
       btnVer.append(criarIcone('lupa', 16), document.createTextNode('Ver Notinha (Zoom)'));
       btnVer.addEventListener('click', () => abrirNotinhaSalva(nota.anexoId));
       acoesLinha.appendChild(btnVer);
-    } else if (!nota.temNotinha) {
+    } else if (!nota.temNotinha && podeLancar) {
       const btnColocarFoto = document.createElement('button');
       btnColocarFoto.type = 'button';
       btnColocarFoto.className = 'btn-acao-cartao btn-acao-zoom';
@@ -930,34 +1013,37 @@ function renderizarHistorico(lancamentosFiltrados) {
       acoesLinha.appendChild(btnColocarFoto);
     }
 
-    const btnCorrigir = document.createElement('button');
-    btnCorrigir.type = 'button';
-    btnCorrigir.className = 'btn-acao-cartao';
-    btnCorrigir.append(criarIcone('editar', 16), document.createTextNode('Corrigir'));
-    btnCorrigir.addEventListener('click', () => abrirNotaParaCorrecao(nota));
-    acoesLinha.appendChild(btnCorrigir);
+    if (podeLancar) {
+      const btnCorrigir = document.createElement('button');
+      btnCorrigir.type = 'button';
+      btnCorrigir.className = 'btn-acao-cartao';
+      btnCorrigir.append(criarIcone('editar', 16), document.createTextNode('Corrigir'));
+      btnCorrigir.addEventListener('click', () => abrirNotaParaCorrecao(nota));
+      acoesLinha.appendChild(btnCorrigir);
 
-    const btnApagar = document.createElement('button');
-    btnApagar.type = 'button';
-    btnApagar.className = 'btn-acao-cartao btn-acao-apagar';
-    btnApagar.append(criarIcone('lixeira', 16), document.createTextNode('Apagar'));
-    btnApagar.addEventListener('click', () => {
-      abrirConfirmacao(
-        'Tem certeza que quer apagar esta nota?',
-        `Nota: "${nota.descricao}" no valor de ${formatarDinheiro(nota.valorCentavos)}. O saldo da verba será atualizado automaticamente.`,
-        async () => {
-          const removida = removerLancamento(estadoUI.dados, nota.id);
-          if (removida && removida.anexoId) {
-            try {
-              await removerAnexo(removida.anexoId);
-            } catch {}
+      const btnApagar = document.createElement('button');
+      btnApagar.type = 'button';
+      btnApagar.className = 'btn-acao-cartao btn-acao-apagar';
+      btnApagar.append(criarIcone('lixeira', 16), document.createTextNode('Apagar'));
+      btnApagar.addEventListener('click', () => {
+        abrirConfirmacao(
+          'Tem certeza que quer apagar esta nota?',
+          `Nota: "${nota.descricao}" no valor de ${formatarDinheiro(nota.valorCentavos)}. O saldo da verba será atualizado automaticamente.`,
+          async () => {
+            const { ok, retorno: removida } = await comitarMutacao((d) => removerLancamento(d, nota.id));
+            if (!ok) return;
+            if (removida && removida.anexoId) {
+              try {
+                await removerAnexo(removida.anexoId);
+              } catch {}
+            }
+            renderizarTudo();
+            mostrarAviso('Nota apagada com sucesso.');
           }
-          renderizarTudo();
-          mostrarAviso('Nota apagada com sucesso.');
-        }
-      );
-    });
-    acoesLinha.appendChild(btnApagar);
+        );
+      });
+      acoesLinha.appendChild(btnApagar);
+    }
 
     info.appendChild(acoesLinha);
 
@@ -1222,19 +1308,29 @@ async function concluirSalvamentoDaNota() {
   }
 
   try {
-    if (estadoUI.notaEmEdicaoId) {
-      const notaCorrigida = atualizarLancamento(estadoUI.dados, estadoUI.notaEmEdicaoId, {
-        tipo: estadoUI.formTipo,
-        verbaId: estadoUI.formVerbaId,
-        categoriaPdde: estadoUI.formTipo === 'gasto' ? estadoUI.formCategoriaPdde : 'custeio',
-        valorCentavos,
-        data: el.inputDataNota.value,
-        descricao: el.inputDescricaoNota.value,
-        fornecedorNome: el.inputFornecedorNota.value,
-        anexoId,
-      });
+    const payloadNota = {
+      tipo: estadoUI.formTipo,
+      verbaId: estadoUI.formVerbaId,
+      categoriaPdde: estadoUI.formTipo === 'gasto' ? estadoUI.formCategoriaPdde : 'custeio',
+      valorCentavos,
+      data: el.inputDataNota.value,
+      descricao: el.inputDescricaoNota.value,
+      fornecedorNome: el.inputFornecedorNota.value,
+      anexoId,
+    };
 
-      // Se havia uma foto antiga e o usuário removeu ou trocou, limpa do IndexedDB
+    if (estadoUI.notaEmEdicaoId) {
+      const idEdicao = estadoUI.notaEmEdicaoId;
+      const { ok, retorno: notaCorrigida } = await comitarMutacao(
+        (d) => atualizarLancamento(d, idEdicao, payloadNota),
+        { preservarFormularioNoConflito: true }
+      );
+      if (!ok) {
+        if (novoAnexoSalvoId) removerAnexo(novoAnexoSalvoId).catch(() => {});
+        return;
+      }
+
+      // Só apaga a foto antiga do IndexedDB após a nuvem confirmar o salvamento
       if (estadoUI.anexoOriginalId && estadoUI.anexoOriginalId !== anexoId) {
         removerAnexo(estadoUI.anexoOriginalId).catch(() => {});
       }
@@ -1247,16 +1343,14 @@ async function concluirSalvamentoDaNota() {
       irParaTela('resumo');
       mostrarAviso('Correção salva com sucesso!');
     } else {
-      const notaCriada = adicionarLancamento(estadoUI.dados, {
-        tipo: estadoUI.formTipo,
-        verbaId: estadoUI.formVerbaId,
-        categoriaPdde: estadoUI.formTipo === 'gasto' ? estadoUI.formCategoriaPdde : 'custeio',
-        valorCentavos,
-        data: el.inputDataNota.value,
-        descricao: el.inputDescricaoNota.value,
-        fornecedorNome: el.inputFornecedorNota.value,
-        anexoId,
-      });
+      const { ok, retorno: notaCriada } = await comitarMutacao(
+        (d) => adicionarLancamento(d, payloadNota),
+        { preservarFormularioNoConflito: true }
+      );
+      if (!ok) {
+        if (novoAnexoSalvoId) removerAnexo(novoAnexoSalvoId).catch(() => {});
+        return;
+      }
 
       estadoUI.anexoPendente = null;
       estadoUI.verbaSelecionadaId = notaCriada.verbaId;
@@ -1360,8 +1454,9 @@ function renderizarListaFornecedores() {
       abrirConfirmacao(
         'Apagar fornecedor?',
         `Tem certeza que deseja apagar o cadastro de "${forn.nome}"? As notas já lançadas continuarão guardadas.`,
-        () => {
-          removerFornecedor(estadoUI.dados, forn.id);
+        async () => {
+          const { ok } = await comitarMutacao((d) => removerFornecedor(d, forn.id));
+          if (!ok) return;
           renderizarListaFornecedores();
           atualizarOpcoesFiltroFornecedor();
           mostrarAviso('Fornecedor removido com sucesso.');
@@ -1497,6 +1592,10 @@ function aplicarZoomNaImagem() {
 }
 
 function abrirVisualizadorDeAnexo(anexo) {
+  if (!anexo || !dataUrlAnexoSegura(anexo.dataUrl)) {
+    mostrarAviso('Arquivo de comprovante inválido ou bloqueado por segurança.', 'erro');
+    return;
+  }
   el.areaImagemNotinha.textContent = '';
   estadoUI.zoomAtualPercentual = 100;
 
@@ -1681,17 +1780,35 @@ function configurarEventos() {
       'Os dados atuais serão substituídos pelos dados salvos no arquivo escolhido. Deseja continuar?',
       async () => {
         try {
-          const resultado = await lerEValidarArquivoBackup(arquivo);
-          estadoUI.dados = resultado.dados;
-          if (modoNuvemAtivo()) {
-            const syncRes = await sincronizarComNuvem(estadoUI.dados);
+          const nuvem = modoNuvemAtivo();
+          const resultado = await lerEValidarArquivoBackup(arquivo, { salvarAnexosAgora: !nuvem });
+          const dadosRestaurar = structuredClone(resultado.dados);
+
+          if (nuvem) {
+            const syncRes = await sincronizarComNuvem(dadosRestaurar);
             if (!syncRes || !syncRes.ok) return;
+            await persistirAnexosBackup(resultado.anexosValidos);
+            estadoUI.dados = dadosRestaurar;
             salvarEstadoEscola(estadoUI.dados, { ignorarNuvem: true });
           } else {
+            // Backup exportado da nuvem traz marcador neutro: preserva PIN local para nao trancar o usuario
+            if (dadosRestaurar.escola && dadosRestaurar.escola.pinHash === 'cloud-bcrypt-managed') {
+              const pinLocalAtual = estadoUI.dados && estadoUI.dados.escola && estadoUI.dados.escola.pinHash;
+              dadosRestaurar.escola.pinHash =
+                pinLocalAtual && pinLocalAtual !== 'cloud-bcrypt-managed'
+                  ? pinLocalAtual
+                  : await gerarHashPin('1234');
+              dadosRestaurar.escola.usandoPinPadrao =
+                estadoUI.dados && estadoUI.dados.escola
+                  ? Boolean(estadoUI.dados.escola.usandoPinPadrao)
+                  : true;
+            }
+            estadoUI.dados = dadosRestaurar;
             salvarEstadoEscola(estadoUI.dados);
           }
           estadoUI.verbaSelecionadaId = 'todas';
           el.subtituloEscola.textContent = estadoUI.dados.escola.nome;
+          el.topoNomeEscola.textContent = estadoUI.dados.escola.nome;
           atualizarDicaPinAcesso();
           fecharModalConfigEscola();
           renderizarTudo();
@@ -1713,6 +1830,12 @@ function configurarEventos() {
     const novoPin = el.inputConfigNovoPin.value.trim();
     const confirmaPin = el.inputConfigConfirmaPin.value.trim();
 
+    if (nome.length < 2) {
+      mostrarAviso('Digite o nome completo da escola antes de salvar.', 'erro');
+      el.inputConfigNomeEscola.focus();
+      return;
+    }
+
     if (novoPin || confirmaPin) {
       if (!/^\d{4}$/.test(novoPin)) {
         mostrarAviso('A nova senha precisa ter exatamente 4 números.', 'erro');
@@ -1730,15 +1853,20 @@ function configurarEventos() {
 
     try {
       if (modoNuvemAtivo()) {
-        estadoUI.dados.escola.nome = nome;
         const meta = { nome_escola: nome };
         if (novoPin) {
           meta.pin_atual = pinAtual;
           meta.novo_pin = novoPin;
         }
-        const syncRes = await sincronizarComNuvem(estadoUI.dados, meta);
-        if (!syncRes || !syncRes.ok) return;
-        salvarEstadoEscola(estadoUI.dados, { ignorarNuvem: true });
+        const { ok } = await comitarMutacao(
+          (d) => {
+            d.escola.nome = nome;
+            if (novoPin) d.escola.usandoPinPadrao = false;
+          },
+          { meta }
+        );
+        if (!ok) return;
+        if (novoPin) marcarPinPersonalizadoNaEscola();
         if (pinAtualEl) pinAtualEl.value = '';
       } else {
         await atualizarConfiguracoesEscola(estadoUI.dados, {
@@ -1799,8 +1927,9 @@ function configurarEventos() {
     abrirConfirmacao(
       'Limpar os exemplos de teste?',
       'Isso apaga apenas as notas de exemplo para você começar a anotar os valores reais da sua escola.',
-      () => {
-        limparExemplosDemonstracao(estadoUI.dados);
+      async () => {
+        const { ok } = await comitarMutacao((d) => limparExemplosDemonstracao(d));
+        if (!ok) return;
         estadoUI.verbaSelecionadaId = 'todas';
         renderizarTudo();
         mostrarAviso('Pronto! Os exemplos foram limpos e o caixa está zerado.');
@@ -1938,15 +2067,22 @@ function configurarEventos() {
     estadoUI.notaIdParaAnexoRapido = null;
     if (!arquivo || !notaId) return;
 
+    let anexoIdSalvo = null;
     try {
       mostrarAviso('Guardando foto da notinha...');
       const processado = await processarArquivoNotinha(arquivo);
       const anexoId = `anexo-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       await salvarAnexo(anexoId, processado);
-      vincularNotinhaNaNota(estadoUI.dados, notaId, anexoId);
+      anexoIdSalvo = anexoId;
+      const { ok } = await comitarMutacao((d) => vincularNotinhaNaNota(d, notaId, anexoId));
+      if (!ok) {
+        removerAnexo(anexoIdSalvo).catch(() => {});
+        return;
+      }
       renderizarTudo();
       mostrarAviso('Foto da notinha salva com sucesso!');
     } catch (erro) {
+      if (anexoIdSalvo) removerAnexo(anexoIdSalvo).catch(() => {});
       mostrarAviso(erro.message || 'Erro ao salvar a foto da notinha.', 'erro');
     }
   });
@@ -1964,14 +2100,16 @@ function configurarEventos() {
     el.modalNovoFornecedor.hidden = true;
   });
 
-  el.formNovoFornecedor.addEventListener('submit', (e) => {
+  el.formNovoFornecedor.addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
-      const novo = adicionarFornecedor(estadoUI.dados, {
+      const payloadForn = {
         nome: el.inputFornNome.value,
         telefone: el.inputFornTel.value,
         observacao: el.inputFornObs.value,
-      });
+      };
+      const { ok, retorno: novo } = await comitarMutacao((d) => adicionarFornecedor(d, payloadForn));
+      if (!ok) return;
       el.modalNovoFornecedor.hidden = true;
       renderizarListaFornecedores();
       atualizarOpcoesFiltroFornecedor();
@@ -2019,9 +2157,10 @@ function configurarEventos() {
       ? `A verba "${verba.nome}" já possui notas lançadas. Ela será removida das abas, mas o histórico das notas continuará salvo em "Todas as Verbas". Deseja continuar?`
       : `Tem certeza que deseja excluir a verba "${verba.nome}"?`;
 
-    abrirConfirmacao('Remover esta verba?', msg, () => {
+    abrirConfirmacao('Remover esta verba?', msg, async () => {
       try {
-        const res = removerOuArquivarVerba(estadoUI.dados, idVerba);
+        const { ok, retorno: res } = await comitarMutacao((d) => removerOuArquivarVerba(d, idVerba));
+        if (!ok) return;
         estadoUI.verbaSelecionadaId = 'todas';
         fecharModalNovaVerba();
         renderizarTudo();
@@ -2036,23 +2175,22 @@ function configurarEventos() {
     });
   });
 
-  el.formNovaVerba.addEventListener('submit', (e) => {
+  el.formNovaVerba.addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
       if (estadoUI.verbaEmEdicaoId) {
-        const atualizada = editarVerba(estadoUI.dados, estadoUI.verbaEmEdicaoId, {
-          nome: el.inputNomeVerba.value,
-          icone: estadoUI.iconeNovaVerba,
-        });
+        const idEdicao = estadoUI.verbaEmEdicaoId;
+        const payload = { nome: el.inputNomeVerba.value, icone: estadoUI.iconeNovaVerba };
+        const { ok, retorno: atualizada } = await comitarMutacao((d) => editarVerba(d, idEdicao, payload));
+        if (!ok) return;
         fecharModalNovaVerba();
         renderizarTudo();
         mostrarAviso(`Verba atualizada para "${atualizada.nome}"!`);
       } else {
-        const nova = adicionarNovaVerba(
-          estadoUI.dados,
-          el.inputNomeVerba.value,
-          estadoUI.iconeNovaVerba
-        );
+        const nomeVerba = el.inputNomeVerba.value;
+        const iconeVerba = estadoUI.iconeNovaVerba;
+        const { ok, retorno: nova } = await comitarMutacao((d) => adicionarNovaVerba(d, nomeVerba, iconeVerba));
+        if (!ok) return;
         estadoUI.verbaSelecionadaId = nova.id;
         fecharModalNovaVerba();
         renderizarTudo();
@@ -2074,26 +2212,25 @@ function configurarEventos() {
 
 async function iniciar() {
   consumirImpersonacaoUrl();
-  estadoUI.dados = await carregarEstadoEscola();
   aplicarPreferenciaLetra(obterPreferenciaLetraMaior());
   configurarEventos();
 
   const btnDispensarAviso = document.getElementById('btn-dispensar-aviso-rpmaster');
   if (btnDispensarAviso) {
     btnDispensarAviso.addEventListener('click', () => {
+      const pub = obterEscolaPublicaAtual();
+      _avisoDispensadoTexto = pub && pub.aviso_rpmaster ? String(pub.aviso_rpmaster).trim() : '';
       document.getElementById('banner-aviso-rpmaster').hidden = true;
     });
   }
   const btnEncerrarSup = document.getElementById('btn-encerrar-suporte-rpmaster');
   if (btnEncerrarSup) {
-    btnEncerrarSup.addEventListener('click', sairParaTelaAcesso);
+    btnEncerrarSup.addEventListener('click', () => sairParaTelaAcesso());
   }
 
   if (modoNuvemAtivo()) {
     const slug = obterSlugEscolaUrl();
-    registrarSincronizadorNuvem((novoEstado) => {
-      sincronizarComNuvem(novoEstado);
-    });
+    estadoUI.dados = normalizarEstadoNuvem(null, null);
 
     try {
       const info = await obterInfoPublicaEscola(slug);
@@ -2107,13 +2244,14 @@ async function iniciar() {
       el.subtituloEscola.textContent = info.escola.nome_escola;
       atualizarDicaPinAcesso();
 
+      const tokenAtivo = obterTokenNuvemAtivo();
       if ((!info.escola.ativo || info.escola.status_assinatura === 'suspenso') && !estaEmImpersonacao()) {
         const motivo = info.escola.bloqueio_motivo ? ` Motivo: ${info.escola.bloqueio_motivo}` : ' Entre em contato com o suporte RPMASTER.';
         exibirBloqueioTelaAcesso(`O sistema de ${info.escola.nome_escola} encontra-se temporariamente suspenso.${motivo}`);
         return;
       }
 
-      if (obterTokenNuvemAtivo()) {
+      if (tokenAtivo) {
         const okPull = await recarregarDaNuvem();
         if (okPull) {
           abrirAplicacaoPrincipal();
@@ -2131,6 +2269,7 @@ async function iniciar() {
       mostrarErroPin(err.message || 'Não foi possível conectar ao servidor da escola.');
     }
   } else {
+    estadoUI.dados = await carregarEstadoEscola();
     el.subtituloEscola.textContent = estadoUI.dados.escola.nome;
     atualizarDicaPinAcesso();
     if (obterSessaoLembrada()) {

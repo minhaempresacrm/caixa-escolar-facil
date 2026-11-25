@@ -4,7 +4,7 @@
  *   e usa network-first para HTML/JS para entregar atualizações imediatamente.
  */
 
-const CACHE_NOME = 'caixa-escolar-facil-v5';
+const CACHE_NOME = 'caixa-escolar-facil-v6';
 const ARQUIVOS_BASE = [
   './',
   './index.html',
@@ -49,7 +49,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((resposta) => {
-        if (resposta && resposta.ok && resposta.type === 'basic') {
+        if (resposta && resposta.ok && resposta.type === 'basic' && !url.includes('rpm_cef_token')) {
           const clone = resposta.clone();
           caches.open(CACHE_NOME).then((cache) => cache.put(event.request, clone)).catch(() => {});
         }

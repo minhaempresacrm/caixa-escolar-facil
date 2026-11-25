@@ -106,11 +106,27 @@ export function consumirImpersonacaoUrl() {
 }
 
 export function estaEmImpersonacao() {
-  return _isMasterOrigin;
+  if (_isMasterOrigin) return true;
+  const slug = obterSlugEscolaUrl();
+  if (!slug || typeof window === 'undefined') return false;
+  try {
+    return Boolean(
+      sessionStorage.getItem('cef_impersonate_token') &&
+      sessionStorage.getItem('cef_impersonate_slug') === slug
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function obterEscolaPublicaAtual() {
   return _escolaPublica;
+}
+
+export function marcarPinPersonalizadoNaEscola() {
+  if (_escolaPublica && typeof _escolaPublica === 'object') {
+    _escolaPublica.mostrar_dica_pin_padrao = false;
+  }
 }
 
 export function obterVersaoEstadoAtual() {
@@ -196,13 +212,28 @@ export async function sairSessaoNuvem() {
   }
 }
 
+function escurecerHex(hex, fator = 0.14) {
+  const limpo = safeHex(hex, '#1D4ED8').slice(1);
+  const r = Math.max(0, Math.round(parseInt(limpo.slice(0, 2), 16) * (1 - fator)));
+  const g = Math.max(0, Math.round(parseInt(limpo.slice(2, 4), 16) * (1 - fator)));
+  const b = Math.max(0, Math.round(parseInt(limpo.slice(4, 6), 16) * (1 - fator)));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
 export function aplicarIdentidadeVisualEscola(escola) {
   if (!escola || typeof document === 'undefined') return;
   const p1 = safeHex(escola.cor_primaria, '#1D4ED8');
+  const p1Hover = escurecerHex(p1, 0.14);
   const p2 = safeHex(escola.cor_destaque, '#059669');
-  document.documentElement.style.setProperty('--azul', p1);
-  document.documentElement.style.setProperty('--azul-escuro', p1);
-  document.documentElement.style.setProperty('--verde', p2);
+  const p2Hover = escurecerHex(p2, 0.14);
+  const root = document.documentElement.style;
+  root.setProperty('--cor-azul', p1);
+  root.setProperty('--cor-azul-hover', p1Hover);
+  root.setProperty('--cor-verde', p2);
+  root.setProperty('--cor-verde-hover', p2Hover);
+  root.setProperty('--azul', p1);
+  root.setProperty('--azul-escuro', p1Hover);
+  root.setProperty('--verde', p2);
   document.title = `${escola.nome_escola || 'Caixa Escolar Fácil'} — Gestão de Verbas Escolares`;
 }
 
